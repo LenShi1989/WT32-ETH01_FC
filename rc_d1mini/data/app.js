@@ -1,6 +1,15 @@
 'use strict';
 // 飛控板與遙控器共用的網頁前端，依 /api/info 的 features 顯示對應功能。
 
+// ---------------------------------------------------------------------------
+// 網頁版本：網頁檔（SPIFFS）與韌體分開更新，各自有版本號。修改網頁檔時請更新此處。
+//   1.3.0  主題改為右上角單一圖示按鈕、重新啟動顯示經過秒數、OTA 頁顯示 spiffs.bat 指令
+//   1.2.0  DO 設定頁、編譯時間、OTA 先檢查 SPIFFS 映像大小
+//   1.1.0  搖桿校正、OLED 顯示、初始免登入、明亮／黑暗／玻璃三種主題
+//   1.0.0  初版：系統狀態、網路設定、PID 設定、OTA、使用者設定
+// ---------------------------------------------------------------------------
+const WEB_VERSION = '1.3.0';
+
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
@@ -186,7 +195,8 @@ async function loadStatus() {
   kv($('#sysInfo'), [
     ['裝置', info.name],
     ['韌體版本', info.fw],
-    ['編譯時間', info.build],
+    ['韌體編譯時間', info.build],
+    ['網頁版本', WEB_VERSION],
     ['運行時間', duration(s.uptime)],
     ['可用記憶體', bytes(s.heap)],
   ]);
@@ -838,7 +848,7 @@ async function init() {
   }
   document.title = info.name || '控制面板';
   $('#brandName').textContent = info.name || '—';
-  $('#brandFw').textContent = info.fw ? '韌體 v' + info.fw : '';
+  $('#brandFw').textContent = (info.fw ? `韌體 v${info.fw}｜` : '') + `網頁 v${WEB_VERSION}`;
   renderAuth();
   $$('[data-feature]').forEach(el => el.classList.toggle('off', !info.features[el.dataset.feature]));
   // 遙控器的定時排程需要時間：裝置尚未校時就用瀏覽器時間同步
