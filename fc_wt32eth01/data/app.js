@@ -3,12 +3,14 @@
 
 // ---------------------------------------------------------------------------
 // 網頁版本：網頁檔（SPIFFS）與韌體分開更新，各自有版本號。修改網頁檔時請更新此處。
+//   1.3.2  DO 開關模式改為 toggle switch
+//   1.3.1  主題按鈕改為圖示＋主題名稱
 //   1.3.0  主題改為右上角單一圖示按鈕、重新啟動顯示經過秒數、OTA 頁顯示 spiffs.bat 指令
 //   1.2.0  DO 設定頁、編譯時間、OTA 先檢查 SPIFFS 映像大小
 //   1.1.0  搖桿校正、OLED 顯示、初始免登入、明亮／黑暗／玻璃三種主題
 //   1.0.0  初版：系統狀態、網路設定、PID 設定、OTA、使用者設定
 // ---------------------------------------------------------------------------
-const WEB_VERSION = '1.3.0';
+const WEB_VERSION = '1.3.2';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -139,7 +141,7 @@ function setTheme(t, save = true) {
   // 按鈕顯示目前主題的圖示，提示文字說明下一個主題
   const next = THEMES[(THEMES.indexOf(t) + 1) % THEMES.length];
   const btn = $('#themeBtn');
-  btn.innerHTML = THEME_ICONS[t];
+  btn.innerHTML = `${THEME_ICONS[t]}<span>${THEME_NAMES[t]}</span>`;
   btn.title = `主題：${THEME_NAMES[t]}（點擊切換為${THEME_NAMES[next]}）`;
   btn.setAttribute('aria-label', btn.title);
   if (save) {
@@ -452,7 +454,9 @@ function buildDoCards(channels, pins) {
     <div class="card" id="do${i}">
       <div class="do-head"><h2 class="do-title"></h2><span class="badge do-state"></span></div>
       <div class="do-control">
-        <button type="button" class="btn do-toggle"></button>
+        <button type="button" class="switch do-toggle" role="switch" aria-checked="false" aria-label="${esc(c.name)} 開關">
+          <span class="switch-track"><span class="switch-thumb"></span></span><span class="switch-text">OFF</span>
+        </button>
         <button type="button" class="btn primary do-pulse">觸發</button>
         <span class="do-note muted small"></span>
       </div>
@@ -480,7 +484,12 @@ function buildDoCards(channels, pins) {
   });
   channels.forEach((c, i) => {
     const card = $('#do' + i);
-    $('.do-toggle', card).onclick = e => doAction('/api/do/set', { ch: i, on: e.target.dataset.on === '1' ? '0' : '1' });
+    $('.do-toggle', card).onclick = e => {
+      const sw = e.currentTarget, on = sw.getAttribute('aria-checked') !== 'true';
+      setSwitch(sw, on);  // 先切換畫面，送出後依裝置實際狀態更新
+      sw.disabled = true;
+      doAction('/api/do/set', { ch: i, on: on ? '1' : '0' }).finally(() => (sw.disabled = false));
+    };
     $('.do-pulse', card).onclick = () => doAction('/api/do/pulse', { ch: i });
   });
 }
@@ -524,10 +533,8 @@ async function loadDo() {
     const tog = $('.do-toggle', card), pulse = $('.do-pulse', card), note = $('.do-note', card);
     tog.classList.toggle('hidden', c.mode !== 0);
     pulse.classList.toggle('hidden', c.mode !== 2);
-    tog.dataset.on = c.on ? '1' : '0';
-    tog.textContent = c.on ? '關閉' : '開啟';
-    tog.classList.toggle('on', c.on);
-    if (c.mode === 0) note.textContent = '開關模式：按按鈕切換 ON / OFF';
+    if (!tog.disabled) setSwitch(tog, c.on);
+    if (c.mode === 0) note.textContent = '開關模式：點擊開關切換 ON / OFF';
     else if (c.mode === 2) note.textContent = c.pulseLeftMs > 0
       ? `輸出中，剩 ${(c.pulseLeftMs / 1000).toFixed(1)} 秒`
       : `點動模式：觸發後 ON ${(c.pulseMs / 1000).toFixed(1)} 秒`;
@@ -543,11 +550,19 @@ async function loadDo() {
   });
 }
 
+function setSwitch(sw, on) {
+  sw.setAttribute('aria-checked', on ? 'true' : 'false');
+  $('.switch-text', sw).textContent = on ? 'ON' : 'OFF';
+}
+
+// 送出 DO 操作；不論成功與否都重新讀取，畫面以裝置實際狀態為準
 async function doAction(path, form) {
   try {
     toast((await api(path, { form })).msg);
-    loadDo();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) {
+    toast(e.message, true);
+  }
+  await loadDo().catch(() => {});
 }
 
 async function saveDo(e) {

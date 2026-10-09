@@ -105,19 +105,20 @@ nav a.active { color: #fff; background: rgba(47,111,237,.18); border-left-color:
 .side-foot { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.08); display: grid; gap: 8px; }
 .side-foot .btn { color: var(--side-fg); border-color: rgba(255,255,255,.2); background: transparent; }
 
-/* 主題切換：內容區右上角的圓形圖示按鈕，與頁面標題同高 */
+/* 主題切換：內容區右上角的膠囊按鈕（圖示＋主題名稱），與頁面標題同高 */
 .theme-btn {
   position: absolute; top: 18px; right: 24px; z-index: 5;
-  width: 38px; height: 38px; padding: 0; border-radius: 50%; cursor: pointer;
-  display: grid; place-items: center;
+  height: 38px; padding: 0 14px 0 11px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 14px; white-space: nowrap;
   background: var(--panel); border: 1px solid var(--line); color: var(--fg);
   box-shadow: var(--shadow); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   transition: transform .15s;
 }
 .theme-btn:hover { border-color: var(--primary); color: var(--primary); }
-.theme-btn:active { transform: scale(.92); }
+.theme-btn:active { transform: scale(.95); }
 .theme-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.theme-btn svg { width: 20px; height: 20px; }
+.theme-btn svg { width: 18px; height: 18px; flex: none; }
 
 /* 重新啟動中 */
 .overlay {
@@ -161,10 +162,10 @@ main { margin-left: var(--side-w); padding: 24px; max-width: 1200px; position: r
   body.menu-open #scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 15; }
   main { margin-left: 0; padding: 16px; }
   /* 手機版：固定在頂端列右側，捲動時仍可切換 */
-  .topbar { padding-right: 56px; }
+  .topbar { padding-right: 104px; }
   #topTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .theme-btn {
-    position: fixed; top: 6px; right: 10px; z-index: 12; width: 34px; height: 34px;
+    position: fixed; top: 6px; right: 10px; z-index: 12; height: 34px; padding: 0 12px 0 9px; font-size: 13px;
     background: transparent; border-color: rgba(255,255,255,.25); color: #fff; box-shadow: none;
   }
   .theme-btn:hover { color: #fff; border-color: rgba(255,255,255,.6); }
@@ -278,7 +279,26 @@ fieldset:disabled { opacity: .5; }
 .do-control { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 40px; margin-bottom: 14px;
   padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .do-control .btn { min-width: 96px; }
-.btn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+/* Toggle switch（DO 開關模式） */
+.switch {
+  display: inline-flex; align-items: center; gap: 10px; padding: 2px; border: 0; background: none;
+  font: inherit; color: var(--fg); cursor: pointer;
+}
+.switch-track {
+  position: relative; flex: none; width: 54px; height: 30px; border-radius: 999px;
+  background: var(--line); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); transition: background .2s;
+}
+.switch-thumb {
+  position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .2s;
+}
+.switch[aria-checked="true"] .switch-track { background: var(--ok); }
+.switch[aria-checked="true"] .switch-thumb { transform: translateX(24px); }
+.switch-text { min-width: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+.switch[aria-checked="true"] .switch-text { color: var(--ok); }
+.switch:focus-visible .switch-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+.switch:disabled { cursor: progress; opacity: .7; }
+@media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
 .sched-list { display: grid; gap: 8px; }
 .sched-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
 .sched-row.off { opacity: .55; }
