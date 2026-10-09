@@ -232,11 +232,11 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
 
 | 項目 | 版本號位置 | 目前版本 | 更新方式 |
 |---|---|---|---|
-| 飛控韌體 | `fc_wt32eth01.ino` 檔頭 `FW_VERSION` | 1.1.1 | 燒錄／OTA 韌體 |
-| 遙控器韌體 | `rc_d1mini.ino` 檔頭 `FW_VERSION` | 1.2.1 | 燒錄／OTA 韌體 |
+| 飛控韌體 | `fc_wt32eth01.ino` 檔頭 `FW_VERSION` | 1.1.2 | 燒錄／OTA 韌體 |
+| 遙控器韌體 | `rc_d1mini.ino` 檔頭 `FW_VERSION` | 1.2.2 | 燒錄／OTA 韌體 |
 | 網頁（兩者共用） | `data/app.js` 開頭 `WEB_VERSION` | 1.3.0 | `spiffs.bat` → OTA 網頁檔 |
 
-- 只改網頁檔（`data/`）時，更新 `WEB_VERSION`；改到韌體程式時，更新 `.ino` 的 `FW_VERSION`。
+- **每次修改都更新 `.ino` 的 `FW_VERSION`**（只改網頁檔也一樣），並在檔頭寫上版本紀錄；有改網頁檔（`data/`）時同時更新 `WEB_VERSION`。
 - 版本紀錄寫在各自檔頭的註解。
 - 韌體編譯時間 `FW_BUILD` 由編譯器自動產生，開機的序列埠訊息也會印出版本與編譯時間。
 
