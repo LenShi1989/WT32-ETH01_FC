@@ -105,18 +105,24 @@ nav a.active { color: #fff; background: rgba(47,111,237,.18); border-left-color:
 .side-foot { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.08); display: grid; gap: 8px; }
 .side-foot .btn { color: var(--side-fg); border-color: rgba(255,255,255,.2); background: transparent; }
 
-/* 主題切換 */
-.theme-switch { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid rgba(255,255,255,.2); border-radius: 7px; overflow: hidden; }
-.theme-switch button {
-  font: inherit; font-size: 13px; padding: 6px 0; border: 0; cursor: pointer;
-  background: transparent; color: var(--side-fg);
+/* 主題切換：內容區右上角，與頁面標題同高 */
+.theme-switch {
+  position: absolute; top: 20px; right: 24px; z-index: 5;
+  display: grid; grid-template-columns: repeat(3, auto);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  box-shadow: var(--shadow); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
 }
-.theme-switch button + button { border-left: 1px solid rgba(255,255,255,.2); }
+.theme-switch button {
+  font: inherit; font-size: 13px; padding: 6px 12px; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted);
+}
+.theme-switch button:hover { color: var(--fg); }
+.theme-switch button + button { border-left: 1px solid var(--line); }
 .theme-switch button.active { background: var(--primary); color: #fff; }
 .auth-note { padding: 10px 12px; border-radius: 7px; font-size: 13px; }
 .auth-note.open { background: rgba(217,138,0,.14); color: var(--warn); }
 .auth-note.locked { background: rgba(31,157,85,.14); color: var(--ok); }
-main { margin-left: var(--side-w); padding: 24px; max-width: 1200px; }
+main { margin-left: var(--side-w); padding: 24px; max-width: 1200px; position: relative; }
 .topbar { display: none; }
 #scrim { display: none; }
 
@@ -131,6 +137,15 @@ main { margin-left: var(--side-w); padding: 24px; max-width: 1200px; }
   body.menu-open #sidebar { transform: none; }
   body.menu-open #scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 15; }
   main { margin-left: 0; padding: 16px; }
+  /* 手機版：固定在頂端列右側，捲動時仍可切換 */
+  .topbar { padding-right: 168px; }
+  #topTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-switch {
+    position: fixed; top: 8px; right: 10px; z-index: 12;
+    background: transparent; border-color: rgba(255,255,255,.25); box-shadow: none;
+  }
+  .theme-switch button { color: #dfe5f5; padding: 5px 9px; }
+  .theme-switch button + button { border-left-color: rgba(255,255,255,.25); }
 }
 
 .page { display: none; }
