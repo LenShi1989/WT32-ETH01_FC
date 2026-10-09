@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>控制面板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <button id="menuBtn" class="icon-btn" aria-label="選單">&#9776;</button>
+  <span id="topTitle">控制面板</span>
+</header>
+
+<aside id="sidebar">
+  <div class="brand">
+    <div id="brandName">—</div>
+    <div id="brandFw" class="muted small"></div>
+  </div>
+  <nav>
+    <a href="#status">系統狀態</a>
+    <a href="#network">網路設定</a>
+    <a href="#pid" data-feature="pid">PID 設定</a>
+    <a href="#ota">OTA 更新</a>
+    <a href="#user">使用者設定</a>
+  </nav>
+  <div class="side-foot">
+    <div id="sideUser" class="muted small"></div>
+    <button id="rebootBtn" class="btn ghost">重新啟動</button>
+  </div>
+</aside>
+<div id="scrim"></div>
+
+<main>
+  <!-- 系統狀態 -->
+  <section id="page-status" class="page">
+    <h1>系統狀態</h1>
+    <div class="grid">
+      <div class="card" data-feature="flight">
+        <h2>飛行狀態</h2>
+        <div id="flightBadges" class="badges"></div>
+        <dl id="flightInfo"></dl>
+      </div>
+      <div class="card" data-feature="rc">
+        <h2>遙控狀態</h2>
+        <div id="rcBadges" class="badges"></div>
+        <dl id="rcInfo"></dl>
+      </div>
+      <div class="card">
+        <h2>WiFi 連線資訊</h2>
+        <dl id="wifiInfo"></dl>
+      </div>
+      <div class="card" data-feature="eth">
+        <h2>乙太網路 (RJ45)</h2>
+        <dl id="ethInfo"></dl>
+      </div>
+      <div class="card">
+        <h2>系統</h2>
+        <dl id="sysInfo"></dl>
+      </div>
+      <div class="card wide">
+        <h2>SPIFFS 檔案</h2>
+        <div class="meter"><div id="fsBar"></div></div>
+        <div id="fsSummary" class="muted small"></div>
+        <table class="table">
+          <thead><tr><th>檔案</th><th class="num">大小</th></tr></thead>
+          <tbody id="fsFiles"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 網路設定 -->
+  <section id="page-network" class="page">
+    <h1>網路設定</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>WiFi 設定</h2>
+        <div class="row">
+          <button id="scanBtn" class="btn">掃描網路</button>
+          <span id="scanState" class="muted small"></span>
+        </div>
+        <ul id="scanList" class="scan-list"></ul>
+        <form id="wifiForm" class="form">
+          <label>SSID<input name="ssid" maxlength="32" required autocomplete="off"></label>
+          <label>密碼
+            <span class="pw"><input name="pass" type="password" maxlength="63" autocomplete="new-password">
+            <button type="button" class="icon-btn pw-toggle" aria-label="顯示密碼">&#128065;</button></span>
+          </label>
+          <div class="row">
+            <button class="btn primary">儲存並連線</button>
+            <button type="button" id="wifiClearBtn" class="btn danger">清除連線設定</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" data-feature="eth">
+        <h2>RJ45 設定</h2>
+        <form id="ethForm" class="form">
+          <div class="seg">
+            <label><input type="radio" name="dhcp" value="1"> DHCP</label>
+            <label><input type="radio" name="dhcp" value="0"> 固定 IP</label>
+          </div>
+          <fieldset id="ethStatic">
+            <label>IP 位址<input name="ip" placeholder="192.168.1.50"></label>
+            <label>子網路遮罩<input name="mask" placeholder="255.255.255.0"></label>
+            <label>預設閘道<input name="gw" placeholder="192.168.1.1"></label>
+            <label>DNS<input name="dns" placeholder="192.168.1.1"></label>
+          </fieldset>
+          <p class="muted small">儲存後裝置會重新啟動。</p>
+          <button class="btn primary">儲存</button>
+        </form>
+      </div>
+
+      <div class="card" data-feature="target">
+        <h2>飛控連線</h2>
+        <form id="targetForm" class="form">
+          <label>飛控 IP<input name="ip" placeholder="留空 = 自動（廣播尋找）"></label>
+          <label>UDP 埠<input name="port" type="number" min="1" max="65535"></label>
+          <p class="muted small">留空時以廣播送出，收到飛控回應後自動鎖定其 IP。同一網段有多台飛控時請填固定 IP。</p>
+          <button class="btn primary">儲存</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- PID 設定 -->
+  <section id="page-pid" class="page" data-feature="pid">
+    <h1>PID 設定</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>即時姿態</h2>
+        <div class="attitude">
+          <div class="horizon"><div id="horizonSky"></div><div class="reticle"></div></div>
+          <dl id="attInfo"></dl>
+        </div>
+        <div class="row">
+          <button id="calBtn" class="btn">水平校正</button>
+          <span id="calState" class="muted small"></span>
+        </div>
+        <p class="muted small">校正前請把機身放在水平面上並保持靜止。</p>
+      </div>
+
+      <div class="card wide">
+        <h2>參數</h2>
+        <form id="pidForm" class="form">
+          <table class="table pid-table">
+            <thead><tr><th>角速度環</th><th>Kp</th><th>Ki</th><th>Kd</th></tr></thead>
+            <tbody>
+              <tr><th>Roll 橫滾</th><td><input name="roll_kp"></td><td><input name="roll_ki"></td><td><input name="roll_kd"></td></tr>
+              <tr><th>Pitch 俯仰</th><td><input name="pitch_kp"></td><td><input name="pitch_ki"></td><td><input name="pitch_kd"></td></tr>
+              <tr><th>Yaw 偏航</th><td><input name="yaw_kp"></td><td><input name="yaw_ki"></td><td><input name="yaw_kd"></td></tr>
+            </tbody>
+          </table>
+          <div class="fields-2">
+            <label>角度環 Kp（自穩強度）<input name="levelKp"></label>
+            <label>最大傾角（度）<input name="maxAngle"></label>
+            <label>最大偏航速率（度/秒）<input name="maxYawRate"></label>
+            <label>積分上限（µs）<input name="iLimit"></label>
+          </div>
+          <label class="check"><input type="checkbox" id="linkRP" checked> Roll / Pitch 參數連動</label>
+          <p id="trimInfo" class="muted small"></p>
+          <div class="row">
+            <button class="btn primary">套用並儲存</button>
+            <button type="button" id="pidDefaultsBtn" class="btn ghost">填入預設值</button>
+            <button type="button" id="pidReloadBtn" class="btn ghost">重新讀取</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- OTA 更新 -->
+  <section id="page-ota" class="page">
+    <h1>OTA 更新</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>上傳更新檔</h2>
+        <form id="otaForm" class="form">
+          <div class="seg">
+            <label><input type="radio" name="type" value="fw" checked> 韌體 (.ino.bin)</label>
+            <label><input type="radio" name="type" value="fs"> 網頁檔 (SPIFFS .bin)</label>
+          </div>
+          <input type="file" name="file" accept=".bin" required>
+          <div class="meter"><div id="otaBar"></div></div>
+          <div id="otaState" class="muted small"></div>
+          <button class="btn primary">開始更新</button>
+        </form>
+        <p class="muted small">更新期間會強制上鎖馬達，完成後自動重新啟動。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 使用者設定 -->
+  <section id="page-user" class="page">
+    <h1>使用者設定</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>登入帳號及密碼</h2>
+        <form id="userForm" class="form">
+          <label>帳號<input name="user" maxlength="32" required autocomplete="username"></label>
+          <label>新密碼<input name="pass" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
+          <label>確認新密碼<input name="pass2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
+          <button class="btn primary">儲存</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
