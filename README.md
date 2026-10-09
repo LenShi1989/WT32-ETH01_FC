@@ -34,9 +34,15 @@ spiffs.bat         產生 SPIFFS 映像（build\*.bin），供 OTA 上傳網頁�
 | 搖桿校正 | — | 即時搖桿數值、行程與中點校正、各軸反向、中點死區 |
 | OLED 顯示 | — | 切換 OLED 畫面：主畫面／連線資訊／自動輪播（含間隔） |
 | OTA 更新 | 上傳韌體或 SPIFFS 映像 | 上傳韌體或 SPIFFS 映像 |
-| 使用者設定 | 變更登入帳號及密碼 | 變更登入帳號及密碼 |
+| 使用者設定 | 設定／清除登入帳號及密碼 | 設定／清除登入帳號及密碼 |
 
-- 所有頁面和 API 都需要登入（HTTP Basic Auth）。**預設帳號／密碼：`admin` / `admin`**，請在第一次登入後修改。
+- **登入**：出廠時沒有帳密，開啟網頁**不需登入**。
+  - 在「使用者設定」頁設定帳號密碼後，所有頁面和 API 都需要登入（HTTP Basic Auth）。
+  - 同一頁可以「清除帳密」，回到不需登入。
+  - 未設定帳密時，任何連上同一網路（含裝置 AP）的人都能修改設定，建議在實際使用前設定。
+- **主題**：側邊欄下方可切換「明亮／黑暗／玻璃」三種風格。
+  - 選擇存在瀏覽器（localStorage），每台電腦／手機各自記憶。
+  - 從未選過時，跟隨系統的淺色／深色設定。
 - 沒有設定 WiFi，或 STA 連線失敗超過 20 秒時，裝置會開啟 AP：
   - 飛控：`WT32-FC-XXXX`；遙控器：`RC-Remote-XXXX`
   - AP 密碼：`12345678`
@@ -198,7 +204,7 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
 | 解鎖條件 | `ARM_THROTTLE_MAX`、`MAX_ARM_TILT_DEG` |
 | 翻機保護 | `CRASH_TILT_DEG`、`CRASH_TIME_MS` |
 | UDP 埠 | `LINK_UDP_PORT` |
-| AP 密碼與預設帳密 | `AP_PASSWORD`、`DEFAULT_USER`、`DEFAULT_PASS` |
+| AP 密碼 | `AP_PASSWORD` |
 
 ## 注意事項
 

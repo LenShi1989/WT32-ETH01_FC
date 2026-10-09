@@ -31,8 +31,8 @@ void begin() {
   net.wifiPass = prefs.getString("wifi_pass", "");
   net.targetIp = prefs.getString("target_ip", "");
   net.targetPort = prefs.getUShort("target_port", LINK_FC_PORT);
-  user.user = prefs.getString("user", DEFAULT_USER);
-  user.pass = prefs.getString("pass", DEFAULT_PASS);
+  user.user = prefs.getString("user", "");
+  user.pass = prefs.getString("pass", "");
 
   display.mode = prefs.getUChar("oled_mode", DISPLAY_MAIN);
   display.rotateSec = prefs.getUChar("oled_rot", 5);

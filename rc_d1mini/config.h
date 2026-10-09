@@ -13,8 +13,7 @@
 #define MDNS_HOST    "rc-remote"        // http://rc-remote.local
 #define AP_SSID_PREFIX "RC-Remote-"
 #define AP_PASSWORD  "12345678"
-#define DEFAULT_USER "admin"
-#define DEFAULT_PASS "admin"
+// 登入帳密預設為空：未設定時網頁不需登入，在「使用者設定」頁設定後才啟用
 
 // ---------------------------------------------------------------------------
 // 腳位（ESP32 D1 mini）

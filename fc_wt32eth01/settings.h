@@ -23,7 +23,7 @@ struct NetConfig {
 };
 
 struct UserConfig {
-  String user, pass;
+  String user, pass;   // user 為空 = 不需登入
 };
 
 namespace Settings {

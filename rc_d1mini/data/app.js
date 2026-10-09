@@ -79,7 +79,7 @@ const pages = {
   sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
   oled: { enter: loadOled },
   ota: {},
-  user: { enter: () => ($('#userForm').user.value = info.user || '') },
+  user: { enter: () => { $('#userForm').user.value = info.user || ''; renderAuth(); } },
 };
 
 function poll(fn, ms) {
@@ -101,6 +101,32 @@ function route() {
   document.body.classList.remove('menu-open');
   $('#topTitle').textContent = `${info.name || ''} · ${$('nav a.active')?.textContent || ''}`;
   pages[name].enter?.();
+}
+
+// ---------------------------------------------------------------------------
+// 主題（存在瀏覽器，各裝置 / 各瀏覽器分開記憶）
+const THEMES = ['light', 'dark', 'glass'];
+
+function setTheme(t, save = true) {
+  if (!THEMES.includes(t)) t = 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  $$('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
+  if (save) {
+    try { localStorage.setItem('theme', t); } catch (e) { /* 無痕模式等情況無法儲存 */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 登入狀態
+function renderAuth() {
+  const on = !!info.authRequired;
+  $('#sideUser').textContent = on ? '登入：' + info.user : '未設定登入帳密';
+  const note = $('#authNote');
+  note.className = 'auth-note ' + (on ? 'locked' : 'open');
+  note.textContent = on
+    ? `已啟用登入，帳號：${info.user}`
+    : '目前未設定帳密，任何連上此網路的人都能開啟網頁。設定帳號密碼後即需登入。';
+  $('#userClearBtn').classList.toggle('hidden', !on);
 }
 
 // ---------------------------------------------------------------------------
@@ -568,9 +594,22 @@ function bind() {
       setTimeout(() => location.reload(), 1500);
     } catch (err) { toast(err.message, true); }
   };
+  $('#userClearBtn').onclick = async () => {
+    if (!confirm('清除帳密後，任何人都能開啟網頁，確定？')) return;
+    try {
+      toast((await api('/api/user/clear', { method: 'POST' })).msg);
+      info = await api('/api/info');
+      $('#userForm').reset();
+      renderAuth();
+    } catch (e) { toast(e.message, true); }
+  };
+
+  // 主題
+  $$('[data-theme-set]').forEach(b => (b.onclick = () => setTheme(b.dataset.themeSet)));
 }
 
 async function init() {
+  setTheme(document.documentElement.getAttribute('data-theme'), false);
   bind();
   try {
     info = await api('/api/info');
@@ -580,7 +619,7 @@ async function init() {
   document.title = info.name || '控制面板';
   $('#brandName').textContent = info.name || '—';
   $('#brandFw').textContent = info.fw ? '韌體 v' + info.fw : '';
-  $('#sideUser').textContent = info.user ? '登入：' + info.user : '';
+  renderAuth();
   $$('[data-feature]').forEach(el => el.classList.toggle('off', !info.features[el.dataset.feature]));
   route();
 }

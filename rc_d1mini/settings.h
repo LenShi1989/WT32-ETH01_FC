@@ -8,7 +8,7 @@ struct NetConfig {
 };
 
 struct UserConfig {
-  String user, pass;
+  String user, pass;   // user 為空 = 不需登入
 };
 
 // 搖桿校正。軸順序：0 油門、1 Roll、2 Pitch、3 Yaw（與 Sticks::Values.raw 相同）

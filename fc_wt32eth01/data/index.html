@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>控制面板</title>
 <link rel="stylesheet" href="style.css">
+<script>
+  // 在畫面繪製前套用主題，避免閃爍（明亮 / 黑暗 / 玻璃風，未選擇時跟隨系統）
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark' && t !== 'glass')
+      t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 </head>
 <body>
 <header class="topbar">
@@ -27,6 +37,11 @@
     <a href="#user">使用者設定</a>
   </nav>
   <div class="side-foot">
+    <div class="theme-switch" role="group" aria-label="主題">
+      <button type="button" data-theme-set="light">明亮</button>
+      <button type="button" data-theme-set="dark">黑暗</button>
+      <button type="button" data-theme-set="glass">玻璃</button>
+    </div>
     <div id="sideUser" class="muted small"></div>
     <button id="rebootBtn" class="btn ghost">重新啟動</button>
   </div>
@@ -294,10 +309,14 @@ R +1.2 P -0.4 11.8V</pre>
       <div class="card">
         <h2>登入帳號及密碼</h2>
         <form id="userForm" class="form">
+          <div id="authNote" class="auth-note"></div>
           <label>帳號<input name="user" maxlength="32" required autocomplete="username"></label>
           <label>新密碼<input name="pass" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
           <label>確認新密碼<input name="pass2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
-          <button class="btn primary">儲存</button>
+          <div class="row">
+            <button class="btn primary">儲存</button>
+            <button type="button" id="userClearBtn" class="btn danger">清除帳密（不需登入）</button>
+          </div>
         </form>
       </div>
     </div>

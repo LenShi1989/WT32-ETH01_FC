@@ -1,4 +1,4 @@
-// 網頁伺服器：SPIFFS 靜態網頁 + JSON API + OTA。所有路徑都需 HTTP Basic 登入。
+// 網頁伺服器：SPIFFS 靜態網頁 + JSON API + OTA。設定帳號後所有路徑都需 HTTP Basic 登入。
 #include "web.h"
 #include "config.h"
 #include "settings.h"
@@ -29,8 +29,17 @@ const char FALLBACK_HTML[] PROGMEM = R"HTML(<!doctype html><html lang="zh-Hant">
 <p><b>韌體：</b><input type="file" name="file" accept=".bin"></p><button>上傳韌體</button></form>
 </body></html>)HTML";
 
+// 未設定帳號時不需登入
+bool authRequired() {
+  return !Settings::user.user.isEmpty();
+}
+
+bool authOk() {
+  return !authRequired() || server.authenticate(Settings::user.user.c_str(), Settings::user.pass.c_str());
+}
+
 bool auth() {
-  if (server.authenticate(Settings::user.user.c_str(), Settings::user.pass.c_str())) return true;
+  if (authOk()) return true;
   server.requestAuthentication(BASIC_AUTH, DEVICE_NAME);
   return false;
 }
@@ -109,6 +118,7 @@ void handleInfo() {
   doc["name"] = DEVICE_NAME;
   doc["fw"] = FW_VERSION;
   doc["user"] = Settings::user.user;
+  doc["authRequired"] = authRequired();
   JsonObject f = doc["features"].to<JsonObject>();
   f["eth"] = true;
   f["pid"] = true;
@@ -289,6 +299,14 @@ void handleUserSave() {
   sendOk("已更新，請使用新帳號密碼重新登入");
 }
 
+void handleUserClear() {
+  if (!auth()) return;
+  Settings::user.user = "";
+  Settings::user.pass = "";
+  Settings::saveUser();
+  sendOk("已清除帳密，之後開啟網頁不需登入");
+}
+
 void handleReboot() {
   if (!auth() || refuseIfArmed()) return;
   sendOk("重新啟動中…");
@@ -301,7 +319,7 @@ void handleOtaUpload() {
   HTTPUpload &up = server.upload();
   switch (up.status) {
     case UPLOAD_FILE_START: {
-      otaAuthed = server.authenticate(Settings::user.user.c_str(), Settings::user.pass.c_str());
+      otaAuthed = authOk();
       otaOk = false;
       otaMsg = "";
       if (!otaAuthed) return;
@@ -370,6 +388,7 @@ void begin() {
   server.on("/api/pid", HTTP_POST, handlePidSave);
   server.on("/api/calibrate", HTTP_POST, handleCalibrate);
   server.on("/api/user", HTTP_POST, handleUserSave);
+  server.on("/api/user/clear", HTTP_POST, handleUserClear);
   server.on("/api/reboot", HTTP_POST, handleReboot);
   server.on("/api/ota", HTTP_POST, handleOtaDone, handleOtaUpload);
   server.onNotFound(handleStatic);

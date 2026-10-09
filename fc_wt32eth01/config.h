@@ -13,8 +13,7 @@
 #define MDNS_HOST    "wt32-fc"          // http://wt32-fc.local
 #define AP_SSID_PREFIX "WT32-FC-"       // 後面接 MAC 末 4 碼
 #define AP_PASSWORD  "12345678"         // AP 密碼至少 8 碼
-#define DEFAULT_USER "admin"
-#define DEFAULT_PASS "admin"
+// 登入帳密預設為空：未設定時網頁不需登入，在「使用者設定」頁設定後才啟用
 
 // ---------------------------------------------------------------------------
 // 腳位（WT32-ETH01 乙太網路已佔用 GPIO0/16/18/19/21/22/23/25/26/27）

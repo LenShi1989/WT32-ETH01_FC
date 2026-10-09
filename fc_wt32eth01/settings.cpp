@@ -38,8 +38,8 @@ void begin() {
   net.ethMask = prefs.getString("eth_mask", "255.255.255.0");
   net.ethDns = prefs.getString("eth_dns", "192.168.1.1");
 
-  user.user = prefs.getString("user", DEFAULT_USER);
-  user.pass = prefs.getString("pass", DEFAULT_PASS);
+  user.user = prefs.getString("user", "");
+  user.pass = prefs.getString("pass", "");
 
   flight = flightDefaults();
   if (prefs.getBytesLength("flight") == sizeof(FlightConfig)) {
