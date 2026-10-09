@@ -3,12 +3,26 @@
 #include <Preferences.h>
 
 namespace {
+constexpr uint16_t STICK_CAL_VERSION = 1;
 Preferences prefs;
 }
 
 namespace Settings {
 NetConfig net;
 UserConfig user;
+StickCal sticks;
+
+StickCal stickDefaults() {
+  StickCal c{};
+  c.version = STICK_CAL_VERSION;
+  c.calibrated = false;
+  c.deadband = STICK_DEADBAND;
+  c.axis[0] = {THROTTLE_RAW_MIN, (THROTTLE_RAW_MIN + THROTTLE_RAW_MAX) / 2, THROTTLE_RAW_MAX, INVERT_THROTTLE};
+  c.axis[1] = {2048 - STICK_RAW_SPAN, 2048, 2048 + STICK_RAW_SPAN, INVERT_ROLL};
+  c.axis[2] = {2048 - STICK_RAW_SPAN, 2048, 2048 + STICK_RAW_SPAN, INVERT_PITCH};
+  c.axis[3] = {2048 - STICK_RAW_SPAN, 2048, 2048 + STICK_RAW_SPAN, INVERT_YAW};
+  return c;
+}
 
 void begin() {
   prefs.begin("cfg", false);
@@ -18,6 +32,17 @@ void begin() {
   net.targetPort = prefs.getUShort("target_port", LINK_FC_PORT);
   user.user = prefs.getString("user", DEFAULT_USER);
   user.pass = prefs.getString("pass", DEFAULT_PASS);
+
+  sticks = stickDefaults();
+  if (prefs.getBytesLength("sticks") == sizeof(StickCal)) {
+    StickCal c;
+    prefs.getBytes("sticks", &c, sizeof(c));
+    if (c.version == STICK_CAL_VERSION) sticks = c;
+  }
+}
+
+void saveSticks() {
+  prefs.putBytes("sticks", &sticks, sizeof(sticks));
 }
 
 void saveWifi() {

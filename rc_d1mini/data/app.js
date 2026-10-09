@@ -76,6 +76,7 @@ const pages = {
   status: { enter: () => poll(loadStatus, 2000) },
   network: { enter: loadNetwork },
   pid: { enter: () => { loadPid(); poll(loadAttitude, 200); } },
+  sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
   ota: {},
   user: { enter: () => ($('#userForm').user.value = info.user || '') },
 };
@@ -293,6 +294,82 @@ async function loadAttitude() {
 }
 
 // ---------------------------------------------------------------------------
+// 搖桿校正（遙控器）
+const STICK_AXES = ['油門', 'Roll', 'Pitch', 'Yaw'];
+let stickFormLoaded = false;
+
+function buildStickRows() {
+  $('#stickRows').innerHTML = STICK_AXES.map((name, i) =>
+    `<div class="stick-row" id="stick${i}">` +
+    `<span class="stick-name">${name}</span>` +
+    `<div class="track"><div class="range"></div><div class="seen"></div><div class="center"></div><div class="pos"></div></div>` +
+    `<span class="stick-val"><b class="out"></b> <span class="raw muted small"></span></span></div>`).join('');
+}
+
+function adcPct(v) {
+  return (Math.max(0, Math.min(4095, v)) / 4095) * 100 + '%';
+}
+
+async function loadSticks() {
+  const s = await api('/api/sticks');
+  if (!$('#stick0')) buildStickRows();
+
+  s.axes.forEach((a, i) => {
+    const row = $('#stick' + i), raw = s.live.raw[i], out = s.live.out[i];
+    const range = $('.range', row), seen = $('.seen', row);
+    range.style.left = adcPct(a.min);
+    range.style.width = `calc(${adcPct(a.max)} - ${adcPct(a.min)})`;
+    $('.center', row).style.left = adcPct(a.center);
+    $('.center', row).style.display = i === 0 ? 'none' : '';
+    $('.pos', row).style.left = adcPct(raw);
+    if (s.calibrating && a.seenMin !== undefined) {
+      seen.style.display = 'block';
+      seen.style.left = adcPct(a.seenMin);
+      seen.style.width = `calc(${adcPct(a.seenMax)} - ${adcPct(a.seenMin)})`;
+    } else {
+      seen.style.display = 'none';
+    }
+    $('.out', row).textContent = i === 0 ? out : (out > 0 ? '+' : '') + out;
+    $('.raw', row).textContent = `ADC ${raw}`;
+  });
+
+  badges($('#stickBadges'), [
+    s.calibrating ? ['校正中', 'warn'] : s.calibrated ? ['已校正', 'ok'] : ['未校正（開機自動取中點）', 'warn'],
+    s.live.arm ? ['解鎖開關 ON', 'bad'] : ['解鎖開關 OFF', 'ok'],
+  ]);
+
+  const msg = $('#stickCalMsg');
+  if (s.calibrating) {
+    const travel = s.axes.map((a, i) =>
+      `${STICK_AXES[i]} ${a.seenMin !== undefined ? a.seenMax - a.seenMin : 0}`).join('、');
+    msg.textContent = `校正中，目前行程：${travel}`;
+  } else {
+    msg.textContent = '';
+  }
+  msg.classList.toggle('active', s.calibrating);
+  $('#stickStartBtn').disabled = s.calibrating;
+  $('#stickFinishBtn').disabled = !s.calibrating;
+  $('#stickCancelBtn').disabled = !s.calibrating;
+
+  if (!stickFormLoaded) {
+    const f = $('#stickForm');
+    s.axes.forEach((a, i) => (f['inv' + i].checked = a.invert));
+    f.deadband.value = s.deadband;
+    stickFormLoaded = true;
+  }
+}
+
+async function stickAction(path, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  try {
+    toast((await api(path, { method: 'POST' })).msg);
+    if (path.endsWith('/reset')) stickFormLoaded = false;
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // OTA
 function uploadOta(e) {
   e.preventDefault();
@@ -437,6 +514,19 @@ function bind() {
   $('#calBtn').onclick = async () => {
     if (!confirm('請將機身放在水平面上並保持靜止，開始校正？')) return;
     try { toast((await api('/api/calibrate', { method: 'POST' })).msg); } catch (e) { toast(e.message, true); }
+  };
+
+  // 搖桿校正
+  $('#stickStartBtn').onclick = () => stickAction('/api/sticks/start');
+  $('#stickFinishBtn').onclick = () => stickAction('/api/sticks/finish');
+  $('#stickCancelBtn').onclick = () => stickAction('/api/sticks/cancel');
+  $('#stickResetBtn').onclick = () =>
+    stickAction('/api/sticks/reset', '恢復預設值會清除校正資料，並以目前位置作為中點。請先放開搖桿，確定？');
+  $('#stickForm').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target, body = { deadband: f.deadband.value };
+    for (let i = 0; i < 4; i++) body['inv' + i] = f['inv' + i].checked ? '1' : '0';
+    try { toast((await api('/api/sticks/options', { form: body })).msg); } catch (err) { toast(err.message, true); }
   };
 
   // OTA

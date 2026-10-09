@@ -109,6 +109,7 @@ void handleInfo() {
   JsonObject f = doc["features"].to<JsonObject>();
   f["rc"] = true;
   f["target"] = true;
+  f["sticks"] = true;
   sendJson(doc);
 }
 
@@ -191,6 +192,89 @@ void handleTargetSave() {
   Settings::saveTarget();
   Link::applyTarget();
   sendOk("已儲存");
+}
+
+// ---------------------------------------------------------------------------
+// 搖桿校正
+void handleSticksGet() {
+  if (!auth()) return;
+  StickCal c = Sticks::getCal();
+  Sticks::Values v = Link::sticks();
+  uint16_t lo[4], hi[4];
+  Sticks::seenRange(lo, hi);
+
+  JsonDocument doc;
+  doc["calibrating"] = Sticks::isCalibrating();
+  doc["calibrated"] = c.calibrated;
+  doc["deadband"] = c.deadband;
+  JsonArray axes = doc["axes"].to<JsonArray>();
+  for (int a = 0; a < 4; a++) {
+    JsonObject o = axes.add<JsonObject>();
+    o["min"] = c.axis[a].min;
+    o["center"] = c.axis[a].center;
+    o["max"] = c.axis[a].max;
+    o["invert"] = c.axis[a].invert;
+    if (hi[a] >= lo[a]) {
+      o["seenMin"] = lo[a];
+      o["seenMax"] = hi[a];
+    }
+  }
+  JsonObject live = doc["live"].to<JsonObject>();
+  JsonArray raw = live["raw"].to<JsonArray>();
+  for (int a = 0; a < 4; a++) raw.add(v.raw[a]);
+  JsonArray out = live["out"].to<JsonArray>();
+  out.add(v.thr);
+  out.add(v.roll);
+  out.add(v.pitch);
+  out.add(v.yaw);
+  live["arm"] = v.arm;
+  sendJson(doc);
+}
+
+void handleSticksStart() {
+  if (!auth() || refuseIfFlying()) return;
+  Sticks::startCalibration();
+  sendOk("校正開始：請把每支搖桿推到各方向底端");
+}
+
+void handleSticksFinish() {
+  if (!auth()) return;
+  StickCal c;
+  String err;
+  if (!Sticks::finishCalibration(c, err)) return sendError(400, err);
+  Settings::sticks = c;
+  Settings::saveSticks();
+  sendOk("校正完成並已儲存");
+}
+
+void handleSticksCancel() {
+  if (!auth()) return;
+  Sticks::cancelCalibration();
+  sendOk("已取消校正");
+}
+
+void handleSticksOptions() {
+  if (!auth() || refuseIfFlying()) return;
+  StickCal c = Sticks::getCal();
+  long db = server.arg("deadband").toInt();
+  if (db < 0 || db > 400) return sendError(400, "死區需為 0~400");
+  c.deadband = db;
+  for (int a = 0; a < 4; a++) c.axis[a].invert = server.arg("inv" + String(a)) == "1";
+  Sticks::setCal(c);
+  // 只更新選項，不把開機自動取得的中點當成校正結果存起來
+  Settings::sticks.deadband = c.deadband;
+  for (int a = 0; a < 4; a++) Settings::sticks.axis[a].invert = c.axis[a].invert;
+  Settings::saveSticks();
+  sendOk("已儲存");
+}
+
+void handleSticksReset() {
+  if (!auth() || refuseIfFlying()) return;
+  Sticks::cancelCalibration();
+  Settings::sticks = Settings::stickDefaults();
+  Settings::saveSticks();
+  Sticks::setCal(Sticks::autoCenter(Settings::sticks));
+  sendOk("已恢復預設值，並以目前位置作為中點");
 }
 
 void handleUserSave() {
@@ -281,6 +365,12 @@ void begin() {
   server.on("/api/wifi/clear", HTTP_POST, handleWifiClear);
   server.on("/api/target", HTTP_GET, handleTargetGet);
   server.on("/api/target", HTTP_POST, handleTargetSave);
+  server.on("/api/sticks", HTTP_GET, handleSticksGet);
+  server.on("/api/sticks/start", HTTP_POST, handleSticksStart);
+  server.on("/api/sticks/finish", HTTP_POST, handleSticksFinish);
+  server.on("/api/sticks/cancel", HTTP_POST, handleSticksCancel);
+  server.on("/api/sticks/options", HTTP_POST, handleSticksOptions);
+  server.on("/api/sticks/reset", HTTP_POST, handleSticksReset);
   server.on("/api/user", HTTP_POST, handleUserSave);
   server.on("/api/reboot", HTTP_POST, handleReboot);
   server.on("/api/ota", HTTP_POST, handleOtaDone, handleOtaUpload);

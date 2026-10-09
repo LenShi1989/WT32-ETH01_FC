@@ -73,7 +73,8 @@ void loop() {
   // 第 2 行：飛控狀態（大字）
   oled.setTextSize(2);
   oled.setCursor(0, 12);
-  if (!t.ok) oled.print("NO LINK");
+  if (s.calibrating) oled.print("CALIBRATE");
+  else if (!t.ok) oled.print("NO LINK");
   else if (t.failsafe) oled.print("FAILSAFE");
   else if (t.armed) oled.print("ARMED");
   else if (!t.imuOk) oled.print("IMU ERR");
@@ -84,7 +85,9 @@ void loop() {
 
   // 第 3 行：飛控姿態與電池
   oled.setCursor(0, 30);
-  if (t.ok) {
+  if (s.calibrating) {
+    oled.print("Move sticks to ends");
+  } else if (t.ok) {
     oled.printf("R%+5.1f P%+5.1f", t.roll, t.pitch);
     if (t.vbat > 0) oled.printf(" %4.1fV", t.vbat);
   } else {

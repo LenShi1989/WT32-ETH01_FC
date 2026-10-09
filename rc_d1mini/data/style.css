@@ -151,6 +151,26 @@ fieldset:disabled { opacity: .5; }
 }
 .reticle { position: absolute; left: 25%; right: 25%; top: 50%; height: 2px; margin-top: -1px; background: #ffd200; }
 
+/* 搖桿校正 */
+.stick-rows { display: grid; gap: 14px; }
+.stick-row { display: grid; grid-template-columns: 56px 1fr 130px; align-items: center; gap: 12px; }
+.stick-name { font-weight: 600; }
+.track { position: relative; height: 18px; border-radius: 4px; background: var(--line); }
+.track > div { position: absolute; top: 0; bottom: 0; }
+.track .range { background: rgba(47,111,237,.25); }
+.track .seen { border: 2px dashed var(--warn); border-radius: 4px; display: none; }
+.track .center { width: 2px; margin-left: -1px; background: var(--muted); }
+.track .pos { width: 4px; margin-left: -2px; background: var(--fg); border-radius: 2px; }
+.stick-val { text-align: right; font-variant-numeric: tabular-nums; }
+.stick-val b { display: inline-block; min-width: 48px; }
+.steps { margin: 0 0 12px; padding-left: 20px; line-height: 1.7; }
+#stickCalMsg { min-height: 1.4em; margin-bottom: 10px; }
+#stickCalMsg.active { color: var(--warn); font-weight: 600; }
+@media (max-width: 480px) {
+  .stick-row { grid-template-columns: 48px 1fr; }
+  .stick-val { grid-column: 1 / -1; text-align: left; }
+}
+
 #toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
   background: #1d2433; color: #fff; padding: 10px 18px; border-radius: 8px;

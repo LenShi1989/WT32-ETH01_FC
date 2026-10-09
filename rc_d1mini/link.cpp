@@ -81,12 +81,14 @@ void linkTask(void *) {
       CtrlPacket p{};
       p.magic = LINK_MAGIC_CTRL;
       p.version = LINK_VERSION;
-      p.flags = s.arm ? CTRL_FLAG_ARM : 0;
       p.seq = seq++;
-      p.throttle = s.thr;
-      p.roll = s.roll;
-      p.pitch = s.pitch;
-      p.yaw = s.yaw;
+      if (!s.calibrating) {  // 校正中送出油門 0、回中、未解鎖
+        p.flags = s.arm ? CTRL_FLAG_ARM : 0;
+        p.throttle = s.thr;
+        p.roll = s.roll;
+        p.pitch = s.pitch;
+        p.yaw = s.yaw;
+      }
       linkSeal(p);
       if (udp.beginPacket(target, port)) {
         udp.write((const uint8_t *)&p, sizeof(p));

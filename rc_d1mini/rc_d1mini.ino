@@ -23,7 +23,7 @@ void setup() {
   Settings::begin();
   if (!SPIFFS.begin(true)) Serial.println("[SYS] SPIFFS 掛載失敗");
 
-  Sticks::begin();   // 取搖桿中點
+  Sticks::begin(Settings::sticks);  // 套用搖桿校正（未校正時取中點）
   Net::begin();
   Link::begin();
   Web::begin();

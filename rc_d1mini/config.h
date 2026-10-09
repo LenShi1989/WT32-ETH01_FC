@@ -30,7 +30,8 @@
 #define PIN_OLED_SCL 22
 #define OLED_ADDR    0x3C
 
-// 搖桿反向（依實際安裝方向調整）
+// 以下為搖桿校正的預設值；實際值請在網頁「搖桿校正」頁設定（存於 NVS）
+// 搖桿反向
 #define INVERT_THROTTLE false
 #define INVERT_ROLL     false
 #define INVERT_PITCH    false
@@ -39,7 +40,7 @@
 // 油門 ADC 範圍（0~4095），兩端各留一點死區
 #define THROTTLE_RAW_MIN 150
 #define THROTTLE_RAW_MAX 3950
-// 回中搖桿：開機時取中點，±此值內視為 0
+// 回中搖桿：未校正時開機取中點，±此值內視為 0
 #define STICK_DEADBAND   60
 #define STICK_RAW_SPAN   1900   // 中點到端點的 ADC 差值
 

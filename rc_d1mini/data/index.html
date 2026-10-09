@@ -21,6 +21,7 @@
     <a href="#status">系統狀態</a>
     <a href="#network">網路設定</a>
     <a href="#pid" data-feature="pid">PID 設定</a>
+    <a href="#sticks" data-feature="sticks">搖桿校正</a>
     <a href="#ota">OTA 更新</a>
     <a href="#user">使用者設定</a>
   </nav>
@@ -164,6 +165,51 @@
             <button class="btn primary">套用並儲存</button>
             <button type="button" id="pidDefaultsBtn" class="btn ghost">填入預設值</button>
             <button type="button" id="pidReloadBtn" class="btn ghost">重新讀取</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 搖桿校正（遙控器） -->
+  <section id="page-sticks" class="page" data-feature="sticks">
+    <h1>搖桿校正</h1>
+    <div class="grid">
+      <div class="card wide">
+        <h2>即時數值</h2>
+        <div id="stickBadges" class="badges"></div>
+        <div id="stickRows" class="stick-rows"></div>
+        <p class="muted small">淺色區塊 = 已校正行程，細線 = 中點，虛線框 = 本次校正記錄到的範圍。</p>
+      </div>
+
+      <div class="card">
+        <h2>校正</h2>
+        <ol class="steps">
+          <li>按「開始校正」。校正期間遙控器只送出油門 0、未解鎖的封包。</li>
+          <li>把每支搖桿往上下左右推到底，並繞幾圈。</li>
+          <li>放開回中搖桿（油門停在任意位置），按「完成」。</li>
+        </ol>
+        <div id="stickCalMsg" class="small"></div>
+        <div class="row">
+          <button id="stickStartBtn" class="btn primary">開始校正</button>
+          <button id="stickFinishBtn" class="btn primary">完成</button>
+          <button id="stickCancelBtn" class="btn ghost">取消</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>選項</h2>
+        <form id="stickForm" class="form">
+          <div class="seg">
+            <label><input type="checkbox" name="inv0"> 油門反向</label>
+            <label><input type="checkbox" name="inv1"> Roll 反向</label>
+            <label><input type="checkbox" name="inv2"> Pitch 反向</label>
+            <label><input type="checkbox" name="inv3"> Yaw 反向</label>
+          </div>
+          <label>中點死區（ADC 值，0~400）<input name="deadband" type="number" min="0" max="400"></label>
+          <div class="row">
+            <button class="btn primary">儲存</button>
+            <button type="button" id="stickResetBtn" class="btn danger">恢復預設值</button>
           </div>
         </form>
       </div>
