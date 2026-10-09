@@ -15,6 +15,7 @@ async function api(path, opts = {}) {
     init.method = opts.method || 'POST';
     init.body = new URLSearchParams(opts.form);
   }
+  if (opts.timeout) init.signal = AbortSignal.timeout(opts.timeout);
   const res = await fetch(path, init);
   let data = {};
   try { data = await res.json(); } catch (e) { /* 非 JSON */ }
@@ -111,11 +112,27 @@ function route() {
 // ---------------------------------------------------------------------------
 // 主題（存在瀏覽器，各裝置 / 各瀏覽器分開記憶）
 const THEMES = ['light', 'dark', 'glass'];
+const THEME_NAMES = { light: '明亮', dark: '黑暗', glass: '玻璃' };
+const SVG = (body) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const THEME_ICONS = {
+  // 太陽
+  light: SVG('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  // 月亮
+  dark: SVG('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  // 閃光（玻璃）
+  glass: SVG('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+};
 
 function setTheme(t, save = true) {
   if (!THEMES.includes(t)) t = 'light';
   document.documentElement.setAttribute('data-theme', t);
-  $$('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
+  // 按鈕顯示目前主題的圖示，提示文字說明下一個主題
+  const next = THEMES[(THEMES.indexOf(t) + 1) % THEMES.length];
+  const btn = $('#themeBtn');
+  btn.innerHTML = THEME_ICONS[t];
+  btn.title = `主題：${THEME_NAMES[t]}（點擊切換為${THEME_NAMES[next]}）`;
+  btn.setAttribute('aria-label', btn.title);
   if (save) {
     try { localStorage.setItem('theme', t); } catch (e) { /* 無痕模式等情況無法儲存 */ }
   }
@@ -591,8 +608,8 @@ function uploadOta(e) {
     let r = {};
     try { r = JSON.parse(xhr.responseText); } catch (err) { /* ignore */ }
     if (xhr.status === 200 && r.ok) {
-      st.textContent = r.msg + ' 稍候自動重新整理…';
-      waitReboot();
+      st.textContent = r.msg;
+      waitReboot(type === 'fs' ? '網頁檔已更新，等待裝置重新上線…' : '韌體已更新，等待裝置以新版本啟動…');
     } else {
       st.textContent = r.msg || `更新失敗 (HTTP ${xhr.status})`;
       busy(btn, false);
@@ -616,15 +633,39 @@ function spiffsCmd() {
   return `spiffs.bat ${dev}${size}`;
 }
 
-function waitReboot() {
-  setTimeout(async function check() {
+// 顯示「重新啟動中」並計時，裝置重新回應後自動重新載入
+function waitReboot(msg = '等待裝置重新上線…') {
+  clearTimeout(pollTimer);
+  pollTimer = null;
+  $('#rebootTitle').textContent = '裝置重新啟動中';
+  $('#rebootMsg').textContent = msg;
+  $('#rebootHint').classList.add('hidden');
+  $('#rebootSpinner').classList.remove('done');
+  $('#rebootOverlay').classList.remove('hidden');
+
+  const t0 = Date.now();
+  const secs = () => Math.floor((Date.now() - t0) / 1000);
+  const tick = setInterval(() => {
+    $('#rebootSecs').textContent = secs();
+    if (secs() >= 60) $('#rebootHint').classList.remove('hidden');
+  }, 200);
+
+  // 裝置約 1 秒後才真正重啟，3 秒後再開始確認，避免誤判為已上線
+  const check = async () => {
     try {
-      await api('/api/info');
-      location.reload();
+      await api('/api/info', { timeout: 2500 });
+      clearInterval(tick);
+      $('#rebootSecs').textContent = secs();
+      $('#rebootTitle').textContent = '已重新上線';
+      $('#rebootMsg').textContent = `重新啟動共 ${secs()} 秒，重新載入頁面…`;
+      $('#rebootHint').classList.add('hidden');
+      $('#rebootSpinner').classList.add('done');
+      setTimeout(() => location.reload(), 1000);
     } catch (e) {
-      setTimeout(check, 2000);
+      setTimeout(check, 1000);
     }
-  }, 5000);
+  };
+  setTimeout(check, 3000);
 }
 
 // ---------------------------------------------------------------------------
@@ -637,7 +678,7 @@ function bind() {
   $('#rebootBtn').onclick = async () => {
     if (!confirm('確定要重新啟動裝置？')) return;
     try {
-      toast((await api('/api/reboot', { method: 'POST' })).msg);
+      await api('/api/reboot', { method: 'POST' });
       waitReboot();
     } catch (e) { toast(e.message, true); }
   };
@@ -679,9 +720,10 @@ function bind() {
     const f = e.target, dhcp = f.querySelector('[name=dhcp]:checked').value;
     if (!confirm('儲存後裝置會重新啟動，確定？')) return;
     try {
-      toast((await api('/api/eth', { form: { dhcp, ip: f.ip.value, gw: f.gw.value, mask: f.mask.value, dns: f.dns.value } })).msg);
-      if (dhcp === '0') toast(`重新啟動後請改連 http://${f.ip.value}/`);
-      waitReboot();
+      await api('/api/eth', { form: { dhcp, ip: f.ip.value, gw: f.gw.value, mask: f.mask.value, dns: f.dns.value } });
+      waitReboot(dhcp === '0'
+        ? `RJ45 設定已儲存。若你是透過 RJ45 連線，重新啟動後請改連 http://${f.ip.value}/`
+        : 'RJ45 設定已儲存（DHCP），等待裝置重新上線…');
     } catch (err) { toast(err.message, true); }
   };
 
@@ -780,7 +822,10 @@ function bind() {
   };
 
   // 主題
-  $$('[data-theme-set]').forEach(b => (b.onclick = () => setTheme(b.dataset.themeSet)));
+  $('#themeBtn').onclick = () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    setTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  };
 }
 
 async function init() {

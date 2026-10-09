@@ -45,12 +45,8 @@
 <div id="scrim"></div>
 
 <main>
-  <!-- 主題切換（右上角；手機版在頂端列右側） -->
-  <div class="theme-switch" role="group" aria-label="主題">
-    <button type="button" data-theme-set="light">明亮</button>
-    <button type="button" data-theme-set="dark">黑暗</button>
-    <button type="button" data-theme-set="glass">玻璃</button>
-  </div>
+  <!-- 主題切換：單一圖示按鈕，點擊依序切換 明亮 → 黑暗 → 玻璃（右上角；手機版在頂端列右側） -->
+  <button type="button" id="themeBtn" class="theme-btn"></button>
   <!-- 系統狀態 -->
   <section id="page-status" class="page">
     <h1>系統狀態</h1>
@@ -342,6 +338,17 @@ R +1.2 P -0.4 11.8V</pre>
 </main>
 
 <div id="toast" role="status"></div>
+
+<!-- 重新啟動中：顯示經過秒數，裝置回應後自動重新載入 -->
+<div id="rebootOverlay" class="overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="rebootTitle">
+  <div class="overlay-box">
+    <div id="rebootSpinner" class="spinner"></div>
+    <h2 id="rebootTitle">裝置重新啟動中</h2>
+    <div class="reboot-secs"><span id="rebootSecs">0</span><small>秒</small></div>
+    <p id="rebootMsg" class="muted small"></p>
+    <p id="rebootHint" class="reboot-hint small hidden">已超過 60 秒仍未回應。請確認裝置電源與網路；若有變更 IP 或 WiFi，請改用新的網址開啟。</p>
+  </div>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

@@ -105,20 +105,43 @@ nav a.active { color: #fff; background: rgba(47,111,237,.18); border-left-color:
 .side-foot { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.08); display: grid; gap: 8px; }
 .side-foot .btn { color: var(--side-fg); border-color: rgba(255,255,255,.2); background: transparent; }
 
-/* 主題切換：內容區右上角，與頁面標題同高 */
-.theme-switch {
-  position: absolute; top: 20px; right: 24px; z-index: 5;
-  display: grid; grid-template-columns: repeat(3, auto);
-  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+/* 主題切換：內容區右上角的圓形圖示按鈕，與頁面標題同高 */
+.theme-btn {
+  position: absolute; top: 18px; right: 24px; z-index: 5;
+  width: 38px; height: 38px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--line); color: var(--fg);
   box-shadow: var(--shadow); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  transition: transform .15s;
 }
-.theme-switch button {
-  font: inherit; font-size: 13px; padding: 6px 12px; border: 0; cursor: pointer;
-  background: transparent; color: var(--muted);
+.theme-btn:hover { border-color: var(--primary); color: var(--primary); }
+.theme-btn:active { transform: scale(.92); }
+.theme-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.theme-btn svg { width: 20px; height: 20px; }
+
+/* 重新啟動中 */
+.overlay {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
+  background: rgba(10, 14, 24, .55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
-.theme-switch button:hover { color: var(--fg); }
-.theme-switch button + button { border-left: 1px solid var(--line); }
-.theme-switch button.active { background: var(--primary); color: #fff; }
+.overlay-box {
+  width: min(360px, 100%); padding: 28px 24px; text-align: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; color: var(--fg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .3); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+}
+:root[data-theme="glass"] .overlay-box { background: rgba(30, 36, 80, .75); }
+.overlay-box h2 { margin: 14px 0 4px; }
+.reboot-secs { font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.reboot-secs small { font-size: 16px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.overlay-box p { margin: 10px 0 0; }
+.reboot-hint { color: var(--warn); }
+.spinner {
+  width: 34px; height: 34px; margin: 0 auto; border-radius: 50%;
+  border: 3px solid var(--line); border-top-color: var(--primary); animation: spin .9s linear infinite;
+}
+.spinner.done { animation: none; border-color: var(--ok); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 .auth-note { padding: 10px 12px; border-radius: 7px; font-size: 13px; }
 .auth-note.open { background: rgba(217,138,0,.14); color: var(--warn); }
 .auth-note.locked { background: rgba(31,157,85,.14); color: var(--ok); }
@@ -138,14 +161,13 @@ main { margin-left: var(--side-w); padding: 24px; max-width: 1200px; position: r
   body.menu-open #scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 15; }
   main { margin-left: 0; padding: 16px; }
   /* 手機版：固定在頂端列右側，捲動時仍可切換 */
-  .topbar { padding-right: 168px; }
+  .topbar { padding-right: 56px; }
   #topTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .theme-switch {
-    position: fixed; top: 8px; right: 10px; z-index: 12;
-    background: transparent; border-color: rgba(255,255,255,.25); box-shadow: none;
+  .theme-btn {
+    position: fixed; top: 6px; right: 10px; z-index: 12; width: 34px; height: 34px;
+    background: transparent; border-color: rgba(255,255,255,.25); color: #fff; box-shadow: none;
   }
-  .theme-switch button { color: #dfe5f5; padding: 5px 9px; }
-  .theme-switch button + button { border-left-color: rgba(255,255,255,.25); }
+  .theme-btn:hover { color: #fff; border-color: rgba(255,255,255,.6); }
 }
 
 .page { display: none; }
