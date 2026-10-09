@@ -25,15 +25,25 @@ struct StickCal {
   StickAxisCal axis[4];
 };
 
+// OLED 顯示
+enum DisplayMode : uint8_t { DISPLAY_MAIN = 0, DISPLAY_LINK = 1, DISPLAY_AUTO = 2 };
+
+struct DisplayConfig {
+  uint8_t mode;          // DisplayMode
+  uint8_t rotateSec;     // 自動輪播間隔（秒）
+};
+
 namespace Settings {
 extern NetConfig net;
 extern UserConfig user;
 extern StickCal sticks;
+extern DisplayConfig display;
 
 void begin();
 void saveWifi();
 void saveTarget();
 void saveUser();
 void saveSticks();
+void saveDisplay();
 StickCal stickDefaults();
 }

@@ -110,6 +110,7 @@ void handleInfo() {
   f["rc"] = true;
   f["target"] = true;
   f["sticks"] = true;
+  f["oled"] = true;
   sendJson(doc);
 }
 
@@ -277,6 +278,28 @@ void handleSticksReset() {
   sendOk("已恢復預設值，並以目前位置作為中點");
 }
 
+// ---------------------------------------------------------------------------
+// OLED 顯示
+void handleDisplayGet() {
+  if (!auth()) return;
+  JsonDocument doc;
+  doc["mode"] = Settings::display.mode;
+  doc["rotateSec"] = Settings::display.rotateSec;
+  sendJson(doc);
+}
+
+void handleDisplaySave() {
+  if (!auth()) return;
+  long mode = server.arg("mode").toInt();
+  long sec = server.arg("rotateSec").toInt();
+  if (mode < DISPLAY_MAIN || mode > DISPLAY_AUTO) return sendError(400, "顯示模式錯誤");
+  if (sec < 2 || sec > 30) return sendError(400, "輪播間隔需為 2~30 秒");
+  Settings::display.mode = mode;
+  Settings::display.rotateSec = sec;
+  Settings::saveDisplay();
+  sendOk("已套用");
+}
+
 void handleUserSave() {
   if (!auth()) return;
   String u = server.arg("user"), p = server.arg("pass");
@@ -371,6 +394,8 @@ void begin() {
   server.on("/api/sticks/cancel", HTTP_POST, handleSticksCancel);
   server.on("/api/sticks/options", HTTP_POST, handleSticksOptions);
   server.on("/api/sticks/reset", HTTP_POST, handleSticksReset);
+  server.on("/api/display", HTTP_GET, handleDisplayGet);
+  server.on("/api/display", HTTP_POST, handleDisplaySave);
   server.on("/api/user", HTTP_POST, handleUserSave);
   server.on("/api/reboot", HTTP_POST, handleReboot);
   server.on("/api/ota", HTTP_POST, handleOtaDone, handleOtaUpload);

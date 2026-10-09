@@ -8,7 +8,8 @@ fc_wt32eth01/      飛控板韌體（Arduino sketch）
   data/            飛控網頁（SPIFFS）
 rc_d1mini/         遙控器韌體（Arduino sketch）
   data/            遙控器網頁（與飛控相同，依裝置自動顯示對應功能）
-docs/              接腳圖、規格書、系統架構圖
+docs/              接腳圖、規格書、系統架構圖、封包格式
+spiffs.bat         產生 SPIFFS 映像（build\*.bin），供 OTA 上傳網頁檔
 ```
 
 ## 系統架構
@@ -31,6 +32,7 @@ docs/              接腳圖、規格書、系統架構圖
 | 網路設定 | WiFi：掃描 SSID、手動輸入、清除設定<br>RJ45：DHCP／固定 IP | WiFi：掃描 SSID、手動輸入、清除設定<br>飛控連線：目標 IP 與埠 |
 | PID 設定 | 即時姿態儀、Roll／Pitch／Yaw PID、自穩強度、水平校正 | — |
 | 搖桿校正 | — | 即時搖桿數值、行程與中點校正、各軸反向、中點死區 |
+| OLED 顯示 | — | 切換 OLED 畫面：主畫面／連線資訊／自動輪播（含間隔） |
 | OTA 更新 | 上傳韌體或 SPIFFS 映像 | 上傳韌體或 SPIFFS 映像 |
 | 使用者設定 | 變更登入帳號及密碼 | 變更登入帳號及密碼 |
 
@@ -95,6 +97,11 @@ WT32-ETH01 的乙太網路已佔用 GPIO 0/16/18/19/21/22/23/25/26/27。
 - **尚未校正時**：使用 `config.h` 的預設行程，並在開機時自動取 Roll／Pitch／Yaw 的中點，**開機時請勿碰觸搖桿**。
 - **反向與死區**：各軸反向和中點死區可以在同一頁設定；`config.h` 的 `INVERT_*`、`STICK_DEADBAND` 只是預設值。
 - **油門**：用絕對值對應（最小值～最大值 → 0～1000）。若用會自動回中的搖桿當油門，回中位置就是 50% 油門，建議換成不回中的搖桿。
+- **OLED 畫面**：在網頁「OLED 顯示」頁切換，設定存在 NVS。
+  - **主畫面**：WiFi IP 與訊號、飛控狀態（大字）、飛控姿態與電池、搖桿位置。
+  - **連線資訊**：飛控 IP、控制封包目標位址與模式（FIXED／AUTO／BCAST）、WiFi 訊號、每秒送出／收到封包數、距上次遙測時間、飛控 Yaw 角速度、姿態與電池。標題列仍顯示飛控狀態。
+  - **自動輪播**：兩個畫面依設定間隔（2～30 秒）輪流顯示。
+  - 搖桿校正期間固定顯示主畫面。
 
 ## 編譯與燒錄
 
@@ -120,12 +127,17 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
 擇一即可：
 
 1. **IDE 外掛**：安裝 Arduino IDE 2.x 的 `arduino-spiffs-upload` 外掛（.vsix 放進 `~/.arduinoIDE/plugins/`），重開 IDE 後按 `Ctrl+Shift+P` →「Upload SPIFFS to Pico/ESP8266/ESP32」。上傳前請關閉序列埠監控視窗。
-2. **自己產生映像，再用 OTA 上傳**：
+2. **用 `spiffs.bat` 產生映像，再用 OTA 上傳**：
    ```
-   mkspiffs -c fc_wt32eth01/data -b 4096 -p 256 -s 0x160000 fc_spiffs.bin
+   spiffs.bat          產生兩個：build\fc_spiffs.bin、build\rc_spiffs.bin
+   spiffs.bat fc       只產生飛控的
+   spiffs.bat rc       只產生遙控器的
    ```
-   `mkspiffs` 在 `%LOCALAPPDATA%\Arduino15\packages\esp32\tools\mkspiffs\` 裡。產生後到「OTA 更新」頁選「網頁檔 (SPIFFS .bin)」上傳。
-   還沒上傳過網頁檔時，首頁會顯示一個救援上傳頁面，也可以在那裡上傳。
+   - 可以在專案資料夾直接雙擊執行。
+   - 會自動找 Arduino IDE 安裝的 `mkspiffs`（`%LOCALAPPDATA%\Arduino15\packages\esp32\tools\mkspiffs\`）。
+   - 產生後到裝置網頁「OTA 更新」頁，選「網頁檔 (SPIFFS .bin)」上傳對應的檔案。
+   - 還沒上傳過網頁檔時，首頁會顯示救援上傳頁面，也可以在那裡上傳。
+   - 映像大小對應 Partition Scheme「Default 4MB with spiffs」（0x160000）。換成其他分區時，請修改 `spiffs.bat` 裡的 `SPIFFS_SIZE`。
 
 韌體 OTA 用的 `.bin`：在 IDE 選「草稿碼 → 匯出已編譯的二進位檔」，取 `*.ino.bin`。
 

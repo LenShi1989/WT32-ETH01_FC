@@ -11,6 +11,7 @@ namespace Settings {
 NetConfig net;
 UserConfig user;
 StickCal sticks;
+DisplayConfig display;
 
 StickCal stickDefaults() {
   StickCal c{};
@@ -33,12 +34,22 @@ void begin() {
   user.user = prefs.getString("user", DEFAULT_USER);
   user.pass = prefs.getString("pass", DEFAULT_PASS);
 
+  display.mode = prefs.getUChar("oled_mode", DISPLAY_MAIN);
+  display.rotateSec = prefs.getUChar("oled_rot", 5);
+  if (display.mode > DISPLAY_AUTO) display.mode = DISPLAY_MAIN;
+  display.rotateSec = constrain(display.rotateSec, 2, 30);
+
   sticks = stickDefaults();
   if (prefs.getBytesLength("sticks") == sizeof(StickCal)) {
     StickCal c;
     prefs.getBytes("sticks", &c, sizeof(c));
     if (c.version == STICK_CAL_VERSION) sticks = c;
   }
+}
+
+void saveDisplay() {
+  prefs.putUChar("oled_mode", display.mode);
+  prefs.putUChar("oled_rot", display.rotateSec);
 }
 
 void saveSticks() {

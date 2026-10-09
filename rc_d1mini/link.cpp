@@ -20,7 +20,7 @@ IPAddress fixedIp;             // 使用者指定的飛控 IP
 bool useFixed = false;
 uint16_t targetPort = LINK_FC_PORT;
 IPAddress currentTarget(255, 255, 255, 255);
-uint32_t txRate = 0;
+uint32_t txRate = 0, rxRate = 0;
 
 void loadTarget() {
   IPAddress ip;
@@ -34,7 +34,7 @@ void loadTarget() {
 
 void linkTask(void *) {
   uint16_t seq = 0;
-  uint32_t txCount = 0, rateStamp = millis();
+  uint32_t txCount = 0, rxCount = 0, rateStamp = millis();
   const TickType_t period = pdMS_TO_TICKS(1000 / LINK_SEND_HZ);
   TickType_t lastWake = xTaskGetTickCount();
 
@@ -60,6 +60,7 @@ void linkTask(void *) {
         fcIp = from;
       }
       portEXIT_CRITICAL(&mux);
+      if (accept) rxCount++;
     }
 
     // ---- 決定目標位址：指定 IP > 自動學到的飛控 IP > 廣播 ----
@@ -99,8 +100,10 @@ void linkTask(void *) {
     if (now - rateStamp >= 1000) {
       portENTER_CRITICAL(&mux);
       txRate = txCount;
+      rxRate = rxCount;
       portEXIT_CRITICAL(&mux);
       txCount = 0;
+      rxCount = 0;
       rateStamp = now;
     }
   }
@@ -146,23 +149,31 @@ Sticks::Values sticks() {
   return s;
 }
 
-String targetText() {
+Stats stats() {
+  Stats r;
   portENTER_CRITICAL(&mux);
-  IPAddress ip = currentTarget;
-  uint16_t port = targetPort;
-  bool fixed = useFixed;
+  r.target = currentTarget;
+  r.port = targetPort;
+  r.fixed = useFixed;
+  r.fcIp = fcIp;
+  r.fcKnown = lastTelemAt != 0;
+  r.txRate = txRate;
+  r.rxRate = rxRate;
   portEXIT_CRITICAL(&mux);
-  String s = ip.toString() + ":" + port;
-  if (!fixed) s += ip == IPAddress(255, 255, 255, 255) ? "（廣播）" : "（自動）";
+  r.broadcast = !r.fixed && r.target == IPAddress(255, 255, 255, 255);
+  return r;
+}
+
+String targetText() {
+  Stats st = stats();
+  String s = st.target.toString() + ":" + st.port;
+  if (!st.fixed) s += st.broadcast ? "（廣播）" : "（自動）";
   return s;
 }
 
 String fcIpText() {
-  portENTER_CRITICAL(&mux);
-  IPAddress ip = fcIp;
-  uint32_t at = lastTelemAt;
-  portEXIT_CRITICAL(&mux);
-  return at ? ip.toString() : String();
+  Stats st = stats();
+  return st.fcKnown ? st.fcIp.toString() : String();
 }
 
 void fillStatus(JsonObject out) {
@@ -181,10 +192,9 @@ void fillStatus(JsonObject out) {
   l["ok"] = t.ok;
   l["target"] = targetText();
   l["fcIp"] = fcIpText();
-  portENTER_CRITICAL(&mux);
-  uint32_t rate = txRate;
-  portEXIT_CRITICAL(&mux);
-  l["txRate"] = rate;
+  Stats st = stats();
+  l["txRate"] = st.txRate;
+  l["rxRate"] = st.rxRate;
   if (t.age != UINT32_MAX) l["age"] = t.age;
 
   JsonObject tm = out["telem"].to<JsonObject>();

@@ -77,6 +77,7 @@ const pages = {
   network: { enter: loadNetwork },
   pid: { enter: () => { loadPid(); poll(loadAttitude, 200); } },
   sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
+  oled: { enter: loadOled },
   ota: {},
   user: { enter: () => ($('#userForm').user.value = info.user || '') },
 };
@@ -187,7 +188,7 @@ function renderRc(r) {
     ['Roll / Pitch / Yaw', `${sk.roll} / ${sk.pitch} / ${sk.yaw}`],
     ['目標', l.target],
     ['飛控 IP', l.fcIp],
-    ['發送', `${l.txRate} 包/秒`],
+    ['封包', `送出 ${l.txRate} 包/秒，收到 ${l.rxRate ?? 0} 包/秒`],
     l.ok && ['飛控姿態', `${deg(t.roll)} / ${deg(t.pitch)}`],
     l.ok && t.vbat > 0 && ['飛控電池', t.vbat.toFixed(2) + ' V'],
     l.ok && ['回應延遲', l.age + ' ms'],
@@ -370,6 +371,21 @@ async function stickAction(path, confirmText) {
 }
 
 // ---------------------------------------------------------------------------
+// OLED 顯示（遙控器）
+async function loadOled() {
+  const d = await api('/api/display');
+  const f = $('#oledForm');
+  f.querySelector(`[name=mode][value="${d.mode}"]`).checked = true;
+  f.rotateSec.value = d.rotateSec;
+  syncOledForm();
+}
+
+function syncOledForm() {
+  const f = $('#oledForm');
+  f.rotateSec.disabled = f.querySelector('[name=mode]:checked')?.value !== '2';
+}
+
+// ---------------------------------------------------------------------------
 // OTA
 function uploadOta(e) {
   e.preventDefault();
@@ -527,6 +543,15 @@ function bind() {
     const f = e.target, body = { deadband: f.deadband.value };
     for (let i = 0; i < 4; i++) body['inv' + i] = f['inv' + i].checked ? '1' : '0';
     try { toast((await api('/api/sticks/options', { form: body })).msg); } catch (err) { toast(err.message, true); }
+  };
+
+  // OLED 顯示
+  $$('#oledForm [name=mode]').forEach(r => (r.onchange = syncOledForm));
+  $('#oledForm').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target;
+    const body = { mode: f.querySelector('[name=mode]:checked').value, rotateSec: f.rotateSec.value };
+    try { toast((await api('/api/display', { form: body })).msg); } catch (err) { toast(err.message, true); }
   };
 
   // OTA

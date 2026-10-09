@@ -22,6 +22,7 @@
     <a href="#network">網路設定</a>
     <a href="#pid" data-feature="pid">PID 設定</a>
     <a href="#sticks" data-feature="sticks">搖桿校正</a>
+    <a href="#oled" data-feature="oled">OLED 顯示</a>
     <a href="#ota">OTA 更新</a>
     <a href="#user">使用者設定</a>
   </nav>
@@ -212,6 +213,55 @@
             <button type="button" id="stickResetBtn" class="btn danger">恢復預設值</button>
           </div>
         </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- OLED 顯示（遙控器） -->
+  <section id="page-oled" class="page" data-feature="oled">
+    <h1>OLED 顯示</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>顯示畫面</h2>
+        <form id="oledForm" class="form">
+          <div class="seg">
+            <label><input type="radio" name="mode" value="0"> 主畫面</label>
+            <label><input type="radio" name="mode" value="1"> 連線資訊</label>
+            <label><input type="radio" name="mode" value="2"> 自動輪播</label>
+          </div>
+          <label>輪播間隔（秒，2~30）<input name="rotateSec" type="number" min="2" max="30"></label>
+          <p class="muted small">按「套用」後 OLED 立即切換並儲存。搖桿校正期間固定顯示主畫面。</p>
+          <button class="btn primary">套用</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>主畫面</h2>
+<pre class="oled">192.168.10.21    -58
+<b>DISARMED</b>
+R +1.2 P -0.4 11.8V
+T   0 [    ]  Y [--|--]
+R [--|##]     P [--|--]</pre>
+        <p class="muted small">WiFi IP 與訊號、飛控狀態（大字）、飛控姿態與電池、搖桿位置。</p>
+      </div>
+
+      <div class="card">
+        <h2>連線資訊</h2>
+<pre class="oled"><span class="inv">LINK         DISARMED</span>
+FC 192.168.10.20
+> 192.168.10.20:4210
+AUTO   RSSI -58dBm
+TX 50/s  RX 20/s
+Last 30ms   Yaw  +0
+R +1.2 P -0.4 11.8V</pre>
+        <dl>
+          <dt>FC</dt><dd>回應遙測的飛控 IP</dd>
+          <dt>&gt;</dt><dd>控制封包送往的位址與埠</dd>
+          <dt>模式</dt><dd>FIXED 指定 IP／AUTO 自動鎖定／BCAST 廣播尋找中</dd>
+          <dt>TX / RX</dt><dd>每秒送出的控制封包／收到的遙測封包</dd>
+          <dt>Last</dt><dd>距上次收到遙測的時間</dd>
+          <dt>Yaw</dt><dd>飛控偏航角速度（°/s）</dd>
+        </dl>
       </div>
     </div>
   </section>
