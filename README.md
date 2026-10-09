@@ -149,16 +149,29 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
 1. **IDE 外掛**：安裝 Arduino IDE 2.x 的 `arduino-spiffs-upload` 外掛（.vsix 放進 `~/.arduinoIDE/plugins/`），重開 IDE 後按 `Ctrl+Shift+P` →「Upload SPIFFS to Pico/ESP8266/ESP32」。上傳前請關閉序列埠監控視窗。
 2. **用 `spiffs.bat` 產生映像，再用 OTA 上傳**：
    ```
-   spiffs.bat          產生兩個：build\fc_spiffs.bin、build\rc_spiffs.bin
-   spiffs.bat fc       只產生飛控的
-   spiffs.bat rc       只產生遙控器的
+   spiffs.bat [fc | rc | all] [分區大小]
+
+   spiffs.bat              產生兩個（Default 分區）：build\fc_spiffs.bin、build\rc_spiffs.bin
+   spiffs.bat fc           只產生飛控的
+   spiffs.bat rc min       只產生遙控器的，Minimal SPIFFS 分區
+   spiffs.bat rc 0x20000   分區大小也可以直接填數值
    ```
-   - 可以在專案資料夾直接雙擊執行。
+   - **映像大小必須等於裝置燒錄時選的 Partition Scheme 的 SPIFFS 分區大小**，否則裝置會拒絕：
+
+     | 第 2 個參數 | 大小 | Partition Scheme |
+     |---|---|---|
+     | `default`（預設） | 0x160000 | Default 4MB with spiffs |
+     | `min` | 0x20000 | Minimal SPIFFS (Large APPS with OTA) |
+     | `minimal` | 0xA0000 | Minimal (1.3MB APP/700KB SPIFFS) |
+     | `noota` | 0x1E0000 | No OTA (2MB APP/2MB SPIFFS) |
+     | `huge` | 0xE0000 | Huge APP (3MB No OTA/1MB SPIFFS) |
+
+   - 不確定裝置用哪個分區時，看裝置網頁「OTA 更新」頁：會顯示 SPIFFS 分區大小，以及應該執行的 `spiffs.bat` 指令。
+   - 可以在專案資料夾直接雙擊執行（使用預設 Default 分區）。
    - 會自動找 Arduino IDE 安裝的 `mkspiffs`（`%LOCALAPPDATA%\Arduino15\packages\esp32\tools\mkspiffs\`）。
    - 產生後到裝置網頁「OTA 更新」頁，選「網頁檔 (SPIFFS .bin)」上傳對應的檔案。
    - 還沒上傳過網頁檔時，首頁會顯示救援上傳頁面，也可以在那裡上傳。
-   - 映像大小對應 Partition Scheme「Default 4MB with spiffs」（0x160000）。換成其他分區時，請修改 `spiffs.bat` 裡的 `SPIFFS_SIZE`。
-   - OTA 頁會顯示裝置的 SPIFFS 分區大小。映像大小不符時，上傳前就會被擋下，不會寫壞分區。
+   - 映像大小不符時，上傳前就會被擋下，不會寫壞分區。
    - 上傳失敗時不會自動格式化。若分區已被寫壞，首頁會改顯示救援上傳頁，可直接重傳；序列埠會印出 `[OTA] 失敗：原因`。
 
 韌體 OTA 用的 `.bin`：在 IDE 選「草稿碼 → 匯出已編譯的二進位檔」，取 `*.ino.bin`。

@@ -81,7 +81,7 @@ const pages = {
   do: { enter: () => { doLoaded.fill(false); poll(loadDo, 1000); } },
   ota: { enter: () => {
     $('#otaFsHint').textContent = info.fsPart
-      ? `本裝置 SPIFFS 分區大小：${info.fsPart} bytes（0x${info.fsPart.toString(16).toUpperCase()}），SPIFFS 映像大小必須相同。`
+      ? `本裝置 SPIFFS 分區大小：${info.fsPart} bytes（${fsHex()}），SPIFFS 映像請用「${spiffsCmd()}」產生。`
       : '';
   } },
   user: { enter: () => { $('#userForm').user.value = info.user || ''; renderAuth(); } },
@@ -572,8 +572,8 @@ function uploadOta(e) {
   if (!file) return;
   const type = form.querySelector('[name=type]:checked').value;
   if (type === 'fs' && info.fsPart && file.size !== info.fsPart) {
-    $('#otaState').textContent = `映像大小 ${file.size} bytes 與 SPIFFS 分區 ${info.fsPart} bytes 不符，` +
-      '請確認 Partition Scheme，並把 spiffs.bat 的 SPIFFS_SIZE 設為 0x' + info.fsPart.toString(16).toUpperCase();
+    $('#otaState').textContent = `映像大小 ${file.size} bytes 與本裝置 SPIFFS 分區 ${info.fsPart} bytes 不符，` +
+      `請用「${spiffsCmd()}」重新產生。`;
     return;
   }
   const btn = form.querySelector('button'), bar = $('#otaBar'), st = $('#otaState');
@@ -602,6 +602,18 @@ function uploadOta(e) {
   busy(btn, true);
   bar.style.width = '0';
   xhr.send(fd);
+}
+
+function fsHex() {
+  return '0x' + (info.fsPart || 0).toString(16).toUpperCase();
+}
+
+// 產生本裝置 SPIFFS 映像的 spiffs.bat 指令
+function spiffsCmd() {
+  const presets = { 0x160000: '', 0x20000: ' min', 0xA0000: ' minimal', 0x1E0000: ' noota', 0xE0000: ' huge' };
+  const dev = info.device === 'RC' ? 'rc' : 'fc';
+  const size = info.fsPart in presets ? presets[info.fsPart] : ' ' + fsHex();
+  return `spiffs.bat ${dev}${size}`;
 }
 
 function waitReboot() {
