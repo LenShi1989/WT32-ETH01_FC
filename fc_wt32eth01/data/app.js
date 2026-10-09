@@ -78,6 +78,7 @@ const pages = {
   pid: { enter: () => { loadPid(); poll(loadAttitude, 200); } },
   sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
   oled: { enter: loadOled },
+  do: { enter: () => { doLoaded.fill(false); poll(loadDo, 1000); } },
   ota: {},
   user: { enter: () => { $('#userForm').user.value = info.user || ''; renderAuth(); } },
 };
@@ -164,6 +165,7 @@ async function loadStatus() {
   kv($('#sysInfo'), [
     ['裝置', info.name],
     ['韌體版本', info.fw],
+    ['編譯時間', info.build],
     ['運行時間', duration(s.uptime)],
     ['可用記憶體', bytes(s.heap)],
   ]);
@@ -177,7 +179,7 @@ async function loadStatus() {
     : '<tr><td colspan="2" class="muted">（沒有檔案）</td></tr>';
 
   if (s.flight) renderFlight(s.flight);
-  if (s.rc) renderRc(s.rc);
+  if (s.rc) renderRc(s.rc, s.do || []);
 }
 
 function renderFlight(f) {
@@ -199,7 +201,7 @@ function renderFlight(f) {
   ]);
 }
 
-function renderRc(r) {
+function renderRc(r, dos) {
   const t = r.telem, l = r.link;
   badges($('#rcBadges'), [
     [l.ok ? '飛控連線中' : '未連線飛控', l.ok ? 'ok' : 'warn'],
@@ -218,6 +220,7 @@ function renderRc(r) {
     l.ok && ['飛控姿態', `${deg(t.roll)} / ${deg(t.pitch)}`],
     l.ok && t.vbat > 0 && ['飛控電池', t.vbat.toFixed(2) + ' V'],
     l.ok && ['回應延遲', l.age + ' ms'],
+    ...dos.map(d => [d.name, d.on ? 'ON' : 'OFF']),
   ]);
 }
 
@@ -397,6 +400,152 @@ async function stickAction(path, confirmText) {
 }
 
 // ---------------------------------------------------------------------------
+// DO 設定（遙控器）
+const DO_MODES = ['開關', '定時', '點動'];
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+const STRAPPING_PINS = [2, 5, 15];
+const doLoaded = [false, false];
+
+function buildDoCards(channels, pins) {
+  const pinOptions = pins.map(p =>
+    `<option value="${p}">GPIO${p}${STRAPPING_PINS.includes(p) ? '（開機腳，慎用）' : ''}</option>`).join('');
+  const html = channels.map((c, i) => {
+    const sched = c.sched.map((s, n) => `
+      <div class="sched-row" data-n="${n}">
+        <label class="check"><input type="checkbox" name="s${n}_en"> 排程 ${n + 1}</label>
+        <input type="time" name="s${n}_on" required> ～ <input type="time" name="s${n}_off" required>
+        <div class="days">${WEEKDAYS.map((w, k) =>
+          `<label><input type="checkbox" name="s${n}_d${k}"><span>${w}</span></label>`).join('')}</div>
+      </div>`).join('');
+    return `
+    <div class="card" id="do${i}">
+      <div class="do-head"><h2 class="do-title"></h2><span class="badge do-state"></span></div>
+      <div class="do-control">
+        <button type="button" class="btn do-toggle"></button>
+        <button type="button" class="btn primary do-pulse">觸發</button>
+        <span class="do-note muted small"></span>
+      </div>
+      <form class="form do-form" data-ch="${i}">
+        <label>名稱<input name="name" maxlength="23" required></label>
+        <div class="fields-2">
+          <label>輸出腳位<select name="pin">${pinOptions}</select></label>
+          <label>觸發準位<select name="activeLow">
+            <option value="0">高電位觸發</option><option value="1">低電位觸發</option></select></label>
+        </div>
+        <div class="seg">${DO_MODES.map((m, k) =>
+          `<label><input type="radio" name="mode" value="${k}"> ${m}</label>`).join('')}</div>
+        <label class="do-field-pulse">點動保持時間（秒，0.1~3600）
+          <input name="pulseSec" type="number" min="0.1" max="3600" step="0.1" required></label>
+        <div class="do-field-sched sched-list">${sched}</div>
+        <button class="btn primary">儲存</button>
+      </form>
+    </div>`;
+  }).join('');
+  $('#doGrid').insertAdjacentHTML('beforeend', html);
+
+  $$('.do-form').forEach(f => {
+    f.addEventListener('change', () => syncDoForm(f));
+    f.onsubmit = saveDo;
+  });
+  channels.forEach((c, i) => {
+    const card = $('#do' + i);
+    $('.do-toggle', card).onclick = e => doAction('/api/do/set', { ch: i, on: e.target.dataset.on === '1' ? '0' : '1' });
+    $('.do-pulse', card).onclick = () => doAction('/api/do/pulse', { ch: i });
+  });
+}
+
+// 依表單中選擇的模式顯示對應欄位
+function syncDoForm(f) {
+  const mode = f.querySelector('[name=mode]:checked')?.value;
+  $('.do-field-pulse', f).classList.toggle('hidden', mode !== '2');
+  $('.do-field-sched', f).classList.toggle('hidden', mode !== '1');
+  $$('.sched-row', f).forEach(r => r.classList.toggle('off', !r.querySelector('[type=checkbox]').checked));
+}
+
+function fillDoForm(f, c) {
+  f.name.value = c.name;
+  f.pin.value = c.pin;
+  f.activeLow.value = c.activeLow ? '1' : '0';
+  f.querySelector(`[name=mode][value="${c.mode}"]`).checked = true;
+  f.pulseSec.value = +(c.pulseMs / 1000).toFixed(1);
+  c.sched.forEach((s, n) => {
+    f[`s${n}_en`].checked = s.en;
+    f[`s${n}_on`].value = s.on;
+    f[`s${n}_off`].value = s.off;
+    for (let k = 0; k < 7; k++) f[`s${n}_d${k}`].checked = !!(s.days >> k & 1);
+  });
+  syncDoForm(f);
+}
+
+async function loadDo() {
+  const d = await api('/api/do');
+  if (!$('#do0')) buildDoCards(d.channels, d.pins);
+  $('#doTime').textContent = d.timeValid ? `${d.time}（星期${WEEKDAYS[d.weekday]}）` : '尚未校時';
+
+  d.channels.forEach((c, i) => {
+    const card = $('#do' + i);
+    $('.do-title', card).textContent = `${c.name}（GPIO${c.pin}）`;
+    const st = $('.do-state', card);
+    st.textContent = c.on ? 'ON' : 'OFF';
+    st.className = 'badge do-state ' + (c.on ? 'ok' : '');
+
+    // 控制區依「已儲存」的模式顯示
+    const tog = $('.do-toggle', card), pulse = $('.do-pulse', card), note = $('.do-note', card);
+    tog.classList.toggle('hidden', c.mode !== 0);
+    pulse.classList.toggle('hidden', c.mode !== 2);
+    tog.dataset.on = c.on ? '1' : '0';
+    tog.textContent = c.on ? '關閉' : '開啟';
+    tog.classList.toggle('on', c.on);
+    if (c.mode === 0) note.textContent = '開關模式：按按鈕切換 ON / OFF';
+    else if (c.mode === 2) note.textContent = c.pulseLeftMs > 0
+      ? `輸出中，剩 ${(c.pulseLeftMs / 1000).toFixed(1)} 秒`
+      : `點動模式：觸發後 ON ${(c.pulseMs / 1000).toFixed(1)} 秒`;
+    else {
+      const n = c.sched.filter(s => s.en).length;
+      note.textContent = !d.timeValid ? '定時模式：裝置尚未校時，排程暫停' : `定時模式：${n} 組排程啟用中`;
+    }
+
+    if (!doLoaded[i]) {
+      fillDoForm($('.do-form', card), c);
+      doLoaded[i] = true;
+    }
+  });
+}
+
+async function doAction(path, form) {
+  try {
+    toast((await api(path, { form })).msg);
+    loadDo();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function saveDo(e) {
+  e.preventDefault();
+  const f = e.target, ch = +f.dataset.ch;
+  const body = {
+    ch, name: f.name.value.trim(), pin: f.pin.value, activeLow: f.activeLow.value,
+    mode: f.querySelector('[name=mode]:checked').value, pulseSec: f.pulseSec.value,
+  };
+  for (let n = 0; n < 4; n++) {
+    let days = 0;
+    for (let k = 0; k < 7; k++) if (f[`s${n}_d${k}`].checked) days |= 1 << k;
+    body[`s${n}_en`] = f[`s${n}_en`].checked ? '1' : '0';
+    body[`s${n}_on`] = f[`s${n}_on`].value;
+    body[`s${n}_off`] = f[`s${n}_off`].value;
+    body[`s${n}_days`] = days;
+  }
+  try {
+    toast((await api('/api/do/config', { form: body })).msg);
+    doLoaded[ch] = false;
+    loadDo();
+  } catch (err) { toast(err.message, true); }
+}
+
+function syncTime(force) {
+  return api('/api/time', { form: { epoch: (Date.now() / 1000).toFixed(0), force: force ? '1' : '0' } });
+}
+
+// ---------------------------------------------------------------------------
 // OLED 顯示（遙控器）
 async function loadOled() {
   const d = await api('/api/display');
@@ -571,6 +720,11 @@ function bind() {
     try { toast((await api('/api/sticks/options', { form: body })).msg); } catch (err) { toast(err.message, true); }
   };
 
+  // DO 時間同步
+  $('#timeSyncBtn').onclick = async () => {
+    try { toast((await syncTime(true)).msg); loadDo(); } catch (e) { toast(e.message, true); }
+  };
+
   // OLED 顯示
   $$('#oledForm [name=mode]').forEach(r => (r.onchange = syncOledForm));
   $('#oledForm').onsubmit = async e => {
@@ -621,6 +775,8 @@ async function init() {
   $('#brandFw').textContent = info.fw ? '韌體 v' + info.fw : '';
   renderAuth();
   $$('[data-feature]').forEach(el => el.classList.toggle('off', !info.features[el.dataset.feature]));
+  // 遙控器的定時排程需要時間：裝置尚未校時就用瀏覽器時間同步
+  if (info.features.do) syncTime(false).catch(() => {});
   route();
 }
 

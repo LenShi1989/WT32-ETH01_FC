@@ -4,6 +4,8 @@
 #include "settings.h"
 #include "net.h"
 #include "link.h"
+#include "outputs.h"
+#include <sys/time.h>
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <Update.h>
@@ -114,6 +116,7 @@ void handleInfo() {
   doc["device"] = "RC";
   doc["name"] = DEVICE_NAME;
   doc["fw"] = FW_VERSION;
+  doc["build"] = FW_BUILD;
   doc["user"] = Settings::user.user;
   doc["authRequired"] = authRequired();
   JsonObject f = doc["features"].to<JsonObject>();
@@ -121,6 +124,7 @@ void handleInfo() {
   f["target"] = true;
   f["sticks"] = true;
   f["oled"] = true;
+  f["do"] = true;
   sendJson(doc);
 }
 
@@ -143,6 +147,12 @@ void handleStatus() {
   }
 
   Link::fillStatus(doc["rc"].to<JsonObject>());
+  JsonArray dos = doc["do"].to<JsonArray>();
+  for (int i = 0; i < DO_COUNT; i++) {
+    JsonObject o = dos.add<JsonObject>();
+    o["name"] = Settings::outputs.ch[i].name;
+    o["on"] = Outputs::state(i).on;
+  }
   sendJson(doc);
 }
 
@@ -310,6 +320,141 @@ void handleDisplaySave() {
   sendOk("已套用");
 }
 
+// ---------------------------------------------------------------------------
+// DO 輸出
+String hhmm(uint16_t min) {
+  char buf[8];
+  min %= 1440;
+  snprintf(buf, sizeof(buf), "%02u:%02u", min / 60, min % 60);
+  return buf;
+}
+
+// "HH:MM" -> 分鐘數，格式錯誤回傳 -1
+int parseHhmm(const String &s) {
+  int c = s.indexOf(':');
+  if (c < 1) return -1;
+  int h = s.substring(0, c).toInt(), m = s.substring(c + 1).toInt();
+  if (h < 0 || h > 23 || m < 0 || m > 59) return -1;
+  return h * 60 + m;
+}
+
+int argChannel() {
+  int ch = server.hasArg("ch") ? server.arg("ch").toInt() : -1;
+  return ch >= 0 && ch < DO_COUNT ? ch : -1;
+}
+
+void handleDoGet() {
+  if (!auth()) return;
+  JsonDocument doc;
+  bool valid = Outputs::timeValid();
+  doc["timeValid"] = valid;
+  if (valid) {
+    time_t t = time(nullptr);
+    tm lt;
+    localtime_r(&t, &lt);
+    char buf[24];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &lt);
+    doc["time"] = buf;
+    doc["weekday"] = lt.tm_wday;
+  }
+  int n;
+  const int8_t *pins = Outputs::allowedPins(n);
+  JsonArray ap = doc["pins"].to<JsonArray>();
+  for (int i = 0; i < n; i++) ap.add(pins[i]);
+
+  JsonArray chs = doc["channels"].to<JsonArray>();
+  for (int i = 0; i < DO_COUNT; i++) {
+    const DoChannel &d = Settings::outputs.ch[i];
+    Outputs::State st = Outputs::state(i);
+    JsonObject o = chs.add<JsonObject>();
+    o["name"] = d.name;
+    o["pin"] = d.pin;
+    o["activeLow"] = d.activeLow;
+    o["mode"] = d.mode;
+    o["pulseMs"] = d.pulseMs;
+    o["on"] = st.on;
+    o["pulseLeftMs"] = st.pulseLeftMs;
+    JsonArray sa = o["sched"].to<JsonArray>();
+    for (const DoSchedule &s : d.sched) {
+      JsonObject so = sa.add<JsonObject>();
+      so["en"] = s.enabled;
+      so["days"] = s.days;
+      so["on"] = hhmm(s.onMin);
+      so["off"] = hhmm(s.offMin);
+    }
+  }
+  sendJson(doc);
+}
+
+void handleDoConfig() {
+  if (!auth()) return;
+  int ch = argChannel();
+  if (ch < 0) return sendError(400, "DO 編號錯誤");
+  DoChannel d = Settings::outputs.ch[ch];
+
+  String name = server.arg("name");
+  name.trim();
+  if (name.isEmpty() || name.length() >= sizeof(d.name)) return sendError(400, "名稱需為 1~23 bytes（中文約 7 字）");
+  int pin = server.arg("pin").toInt();
+  if (!Outputs::isAllowedPin(pin)) return sendError(400, "此腳位不可作為 DO 輸出");
+  for (int i = 0; i < DO_COUNT; i++)
+    if (i != ch && Settings::outputs.ch[i].pin == pin) return sendError(400, "腳位與其他 DO 重複");
+  int mode = server.arg("mode").toInt();
+  if (mode < DO_SWITCH || mode > DO_PULSE) return sendError(400, "模式錯誤");
+  float pulseSec = server.arg("pulseSec").toFloat();
+  if (!(pulseSec >= 0.1f && pulseSec <= 3600.0f)) return sendError(400, "點動保持時間需為 0.1~3600 秒");
+
+  for (int s = 0; s < DO_SCHEDULES; s++) {
+    String p = "s" + String(s) + "_";
+    DoSchedule &sc = d.sched[s];
+    sc.enabled = server.arg(p + "en") == "1";
+    sc.days = server.arg(p + "days").toInt() & 0x7F;
+    int on = parseHhmm(server.arg(p + "on")), off = parseHhmm(server.arg(p + "off"));
+    if (on < 0 || off < 0) return sendError(400, "排程 " + String(s + 1) + " 時間格式錯誤");
+    if (sc.enabled && on == off) return sendError(400, "排程 " + String(s + 1) + " 開始與結束時間不可相同");
+    if (sc.enabled && sc.days == 0) return sendError(400, "排程 " + String(s + 1) + " 請至少選一天");
+    sc.onMin = on;
+    sc.offMin = off;
+  }
+
+  strlcpy(d.name, name.c_str(), sizeof(d.name));
+  d.pin = pin;
+  d.activeLow = server.arg("activeLow") == "1";
+  d.mode = mode;
+  d.pulseMs = (uint32_t)lroundf(pulseSec * 1000);
+  Settings::outputs.ch[ch] = d;
+  Settings::saveOutputs();
+  Outputs::setConfig(Settings::outputs);
+  sendOk("已儲存");
+}
+
+void handleDoSet() {
+  if (!auth()) return;
+  int ch = argChannel();
+  if (ch < 0) return sendError(400, "DO 編號錯誤");
+  if (!Outputs::setSwitch(ch, server.arg("on") == "1")) return sendError(409, "此 DO 不是開關模式");
+  sendOk(server.arg("on") == "1" ? "已開啟" : "已關閉");
+}
+
+void handleDoPulse() {
+  if (!auth()) return;
+  int ch = argChannel();
+  if (ch < 0) return sendError(400, "DO 編號錯誤");
+  if (!Outputs::trigger(ch)) return sendError(409, "此 DO 不是點動模式");
+  sendOk("已觸發");
+}
+
+// 以瀏覽器時間校時（沒有對外網路、NTP 無法使用時）
+void handleTimeSet() {
+  if (!auth()) return;
+  double epoch = server.arg("epoch").toDouble();
+  if (epoch < 1700000000.0) return sendError(400, "時間格式錯誤");
+  if (Outputs::timeValid() && server.arg("force") != "1") return sendOk("時間已校正，不需同步");
+  timeval tv{(time_t)epoch, 0};
+  settimeofday(&tv, nullptr);
+  sendOk("已同步瀏覽器時間");
+}
+
 void handleUserSave() {
   if (!auth()) return;
   String u = server.arg("user"), p = server.arg("pass");
@@ -414,6 +559,11 @@ void begin() {
   server.on("/api/sticks/reset", HTTP_POST, handleSticksReset);
   server.on("/api/display", HTTP_GET, handleDisplayGet);
   server.on("/api/display", HTTP_POST, handleDisplaySave);
+  server.on("/api/do", HTTP_GET, handleDoGet);
+  server.on("/api/do/config", HTTP_POST, handleDoConfig);
+  server.on("/api/do/set", HTTP_POST, handleDoSet);
+  server.on("/api/do/pulse", HTTP_POST, handleDoPulse);
+  server.on("/api/time", HTTP_POST, handleTimeSet);
   server.on("/api/user", HTTP_POST, handleUserSave);
   server.on("/api/user/clear", HTTP_POST, handleUserClear);
   server.on("/api/reboot", HTTP_POST, handleReboot);

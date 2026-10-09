@@ -12,15 +12,26 @@
 #include "net.h"
 #include "link.h"
 #include "web.h"
+#include "outputs.h"
 #include <SPIFFS.h>
+
+// ---------------------------------------------------------------------------
+// 韌體版本
+//   1.2.0  2 組 DO 輸出（開關／定時排程／點動），腳位可在網頁設定
+//   1.1.0  搖桿校正、OLED 畫面切換、初始免登入、三種主題
+//   1.0.0  初版：搖桿 UDP 遙控、OLED、WiFi 設定、OTA、帳密設定
+// ---------------------------------------------------------------------------
+const char FW_VERSION[] = "1.2.0";
+const char FW_BUILD[] = __DATE__ " " __TIME__;
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("\n[SYS] %s v%s\n", DEVICE_NAME, FW_VERSION);
+  Serial.printf("\n[SYS] %s v%s (%s)\n", DEVICE_NAME, FW_VERSION, FW_BUILD);
 
   Display::begin();
   Display::showMessage("RC starting...", "Hands off sticks");
   Settings::begin();
+  Outputs::begin(Settings::outputs);  // DO 開機一律為「關」
   if (!SPIFFS.begin(true)) Serial.println("[SYS] SPIFFS 掛載失敗");
 
   Sticks::begin(Settings::sticks);  // 套用搖桿校正（未校正時取中點）

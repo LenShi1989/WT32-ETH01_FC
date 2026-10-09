@@ -117,6 +117,7 @@ void handleInfo() {
   doc["device"] = "FC";
   doc["name"] = DEVICE_NAME;
   doc["fw"] = FW_VERSION;
+  doc["build"] = FW_BUILD;
   doc["user"] = Settings::user.user;
   doc["authRequired"] = authRequired();
   JsonObject f = doc["features"].to<JsonObject>();

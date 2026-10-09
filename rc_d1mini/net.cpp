@@ -3,11 +3,13 @@
 #include "settings.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <time.h>
 
 namespace {
 bool apActive = false;
 uint32_t staDownSince = 0;   // STA 未連線起算時間
 uint32_t staUpSince = 0;     // STA 連線起算時間
+bool ntpStarted = false;
 String apSsid;
 
 void startAp() {
@@ -44,6 +46,10 @@ namespace Net {
 void begin() {
   Network.onEvent(onEvent);
 
+  // 時區先設好，瀏覽器同步的時間也能正確換算成本地時間
+  setenv("TZ", TIMEZONE, 1);
+  tzset();
+
   uint8_t mac[6];
   WiFi.macAddress(mac);
   char suffix[8];
@@ -68,6 +74,10 @@ void loop() {
   uint32_t now = millis();
   if (WiFi.isConnected()) {
     if (!staUpSince) staUpSince = now;
+    if (!ntpStarted) {  // 第一次連上網路時啟動 NTP（沒有對外網路時由網頁同步時間）
+      configTzTime(TIMEZONE, NTP_SERVER1, NTP_SERVER2);
+      ntpStarted = true;
+    }
     staDownSince = 0;
     if (apActive && now - staUpSince > AP_LINGER_MS) stopAp();
   } else {

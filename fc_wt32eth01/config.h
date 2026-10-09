@@ -8,7 +8,9 @@
 // ---------------------------------------------------------------------------
 // 裝置
 // ---------------------------------------------------------------------------
-#define FW_VERSION   "1.0.0"
+// 韌體版本與編譯時間定義在 .ino（修改版本請改 .ino 檔頭）
+extern const char FW_VERSION[];
+extern const char FW_BUILD[];
 #define DEVICE_NAME  "WT32-FC"
 #define MDNS_HOST    "wt32-fc"          // http://wt32-fc.local
 #define AP_SSID_PREFIX "WT32-FC-"       // 後面接 MAC 末 4 碼

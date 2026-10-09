@@ -164,6 +164,7 @@ dd { margin: 0; word-break: break-all; font-variant-numeric: tabular-nums; }
 .form { display: grid; gap: 12px; }
 .form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 .form label.check { display: flex; align-items: center; gap: 8px; color: var(--fg); }
+select,
 input:not([type=radio]):not([type=checkbox]):not([type=file]) {
   width: 100%; padding: 8px 10px; font: inherit; color: var(--fg);
   background: var(--input-bg); border: 1px solid var(--line); border-radius: 7px;
@@ -232,6 +233,29 @@ fieldset:disabled { opacity: .5; }
   .stick-row { grid-template-columns: 48px 1fr; }
   .stick-val { grid-column: 1 / -1; text-align: left; }
 }
+
+/* DO 設定 */
+.do-time { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.do-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.do-head h2 { margin: 0; }
+.do-control { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 40px; margin-bottom: 14px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.do-control .btn { min-width: 96px; }
+.btn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.sched-list { display: grid; gap: 8px; }
+.sched-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
+.sched-row.off { opacity: .55; }
+.sched-row input[type=time] { width: 128px !important; flex: none; }  /* 蓋過全域 input 寬度 */
+.sched-row .check { display: flex; align-items: center; gap: 4px; color: var(--fg); }
+.days { display: flex; gap: 4px; }
+.days label { display: block; }
+.days input { position: absolute; opacity: 0; pointer-events: none; }
+.days span {
+  display: inline-block; width: 28px; line-height: 26px; text-align: center; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--muted);
+}
+.days input:checked + span { background: var(--primary); border-color: var(--primary); color: #fff; }
+.days input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
 
 /* OLED 畫面示意 */
 .oled {

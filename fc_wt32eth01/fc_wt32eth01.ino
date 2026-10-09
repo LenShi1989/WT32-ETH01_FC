@@ -12,10 +12,18 @@
 #include "web.h"
 #include <SPIFFS.h>
 
+// ---------------------------------------------------------------------------
+// 韌體版本
+//   1.1.0  網頁初始免登入（設定帳密後才需登入）、明亮／黑暗／玻璃三種主題
+//   1.0.0  初版：自主平衡、RJ45／WiFi 設定、PID 設定、OTA、帳密設定
+// ---------------------------------------------------------------------------
+const char FW_VERSION[] = "1.1.0";
+const char FW_BUILD[] = __DATE__ " " __TIME__;
+
 void setup() {
   Flight::beginMotors();  // 先讓電調收到最低油門
   Serial.begin(115200);
-  Serial.printf("\n[SYS] %s v%s\n", DEVICE_NAME, FW_VERSION);
+  Serial.printf("\n[SYS] %s v%s (%s)\n", DEVICE_NAME, FW_VERSION, FW_BUILD);
 
   Settings::begin();
   if (!SPIFFS.begin(true)) Serial.println("[SYS] SPIFFS 掛載失敗");

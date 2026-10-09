@@ -8,7 +8,9 @@
 // ---------------------------------------------------------------------------
 // 裝置
 // ---------------------------------------------------------------------------
-#define FW_VERSION   "1.0.0"
+// 韌體版本與編譯時間定義在 .ino（修改版本請改 .ino 檔頭）
+extern const char FW_VERSION[];
+extern const char FW_BUILD[];
 #define DEVICE_NAME  "RC-Remote"
 #define MDNS_HOST    "rc-remote"        // http://rc-remote.local
 #define AP_SSID_PREFIX "RC-Remote-"
@@ -42,6 +44,21 @@
 // 回中搖桿：未校正時開機取中點，±此值內視為 0
 #define STICK_DEADBAND   60
 #define STICK_RAW_SPAN   1900   // 中點到端點的 ADC 差值
+
+// ---------------------------------------------------------------------------
+// DO 輸出（繼電器）
+// 腳位、模式、排程在網頁「DO 設定」頁設定（存於 NVS），以下為預設值
+// ---------------------------------------------------------------------------
+#define DO_DEFAULT_PIN1  26
+#define DO_DEFAULT_PIN2  27
+// 網頁可選的腳位：排除搖桿、解鎖開關、OLED、Flash(6~11)、UART0(1,3)、
+// GPIO0 / GPIO12（開機 strapping 腳，被繼電器模組拉住會無法開機）
+#define DO_ALLOWED_PINS  {2, 4, 5, 13, 14, 15, 16, 17, 18, 19, 23, 26, 27, 32, 33}
+
+// 定時排程用的時間：連上網路時以 NTP 校時，否則由網頁以瀏覽器時間同步
+#define TIMEZONE     "CST-8"            // POSIX TZ 格式，台灣 UTC+8
+#define NTP_SERVER1  "pool.ntp.org"
+#define NTP_SERVER2  "time.google.com"
 
 // ---------------------------------------------------------------------------
 // 遙控連線

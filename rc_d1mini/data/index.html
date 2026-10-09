@@ -33,6 +33,7 @@
     <a href="#pid" data-feature="pid">PID 設定</a>
     <a href="#sticks" data-feature="sticks">搖桿校正</a>
     <a href="#oled" data-feature="oled">OLED 顯示</a>
+    <a href="#do" data-feature="do">DO 設定</a>
     <a href="#ota">OTA 更新</a>
     <a href="#user">使用者設定</a>
   </nav>
@@ -277,6 +278,21 @@ R +1.2 P -0.4 11.8V</pre>
           <dt>Last</dt><dd>距上次收到遙測的時間</dd>
           <dt>Yaw</dt><dd>飛控偏航角速度（°/s）</dd>
         </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- DO 設定（遙控器） -->
+  <section id="page-do" class="page" data-feature="do">
+    <h1>DO 設定</h1>
+    <div class="grid" id="doGrid">
+      <div class="card wide">
+        <h2>裝置時間</h2>
+        <div class="row">
+          <span id="doTime" class="do-time">—</span>
+          <button type="button" id="timeSyncBtn" class="btn ghost">以瀏覽器時間同步</button>
+        </div>
+        <p class="muted small">定時排程需要正確時間。連上可上網的 WiFi 時會自動以 NTP 校時；否則開啟此網頁時會以瀏覽器時間同步。重新開機後若無 NTP，需再開一次網頁同步。</p>
       </div>
     </div>
   </section>
