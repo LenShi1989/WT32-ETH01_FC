@@ -3,6 +3,7 @@
 
 // ---------------------------------------------------------------------------
 // 網頁版本：網頁檔（SPIFFS）與韌體分開更新，各自有版本號。修改網頁檔時請更新此處。
+//   1.4.0  虛擬遙控頁：兩個虛擬搖桿經 WebSocket 控制無人機
 //   1.3.2  DO 開關模式改為 toggle switch
 //   1.3.1  主題按鈕改為圖示＋主題名稱
 //   1.3.0  主題改為右上角單一圖示按鈕、重新啟動顯示經過秒數、OTA 頁顯示 spiffs.bat 指令
@@ -10,7 +11,7 @@
 //   1.1.0  搖桿校正、OLED 顯示、初始免登入、明亮／黑暗／玻璃三種主題
 //   1.0.0  初版：系統狀態、網路設定、PID 設定、OTA、使用者設定
 // ---------------------------------------------------------------------------
-const WEB_VERSION = '1.3.2';
+const WEB_VERSION = '1.4.0';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -90,6 +91,7 @@ const pages = {
   pid: { enter: () => { loadPid(); poll(loadAttitude, 200); } },
   sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
   oled: { enter: loadOled },
+  vstick: { enter: () => { vsInit(); poll(vsPollIdle, 1000); } },
   do: { enter: () => { doLoaded.fill(false); poll(loadDo, 1000); } },
   ota: { enter: () => {
     $('#otaFsHint').textContent = info.fsPart
@@ -247,6 +249,7 @@ function renderRc(r, dos) {
   kv($('#rcInfo'), [
     ['油門', sk.thr],
     ['Roll / Pitch / Yaw', `${sk.roll} / ${sk.pitch} / ${sk.yaw}`],
+    ['輸入來源', { physical: '實體搖桿', virtual: '網頁虛擬搖桿', lost: '網頁中斷（停送封包）' }[r.source] || '實體搖桿'],
     ['目標', l.target],
     ['飛控 IP', l.fcIp],
     ['封包', `送出 ${l.txRate} 包/秒，收到 ${l.rxRate ?? 0} 包/秒`],
@@ -589,6 +592,246 @@ async function saveDo(e) {
 
 function syncTime(force) {
   return api('/api/time', { form: { epoch: (Date.now() / 1000).toFixed(0), force: force ? '1' : '0' } });
+}
+
+// ---------------------------------------------------------------------------
+// 虛擬遙控（遙控器）：兩個虛擬搖桿經 WebSocket 送到遙控器，取代實體搖桿
+//   - 只在飛控上鎖時能開始；切換到其他頁面時仍持續傳送（切到背景分頁則會中斷）
+//   - 拖曳以手指按下的位置為基準（相對移動），按下油門區不會讓油門跳動
+const VS_SEND_MS = 30;
+const vs = {
+  ws: null, want: false, bound: false,
+  thr: 0, yaw: 0, pitch: 0, roll: 0, arm: false,
+  st: null, serverMode: 'idle', prevFcArmed: false,
+  sendTimer: null, retryTimer: null,
+  keys: new Set(), kb: { yaw: false, pitch: false, roll: false },
+};
+
+const vsClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const vsControlling = () => vs.want && vs.ws && vs.ws.readyState === WebSocket.OPEN;
+
+function vsBindPad(pad, onStart, onMove, onEnd) {
+  let id = null, sx = 0, sy = 0;
+  pad.addEventListener('pointerdown', e => {
+    if (!vsControlling() || id !== null) return;
+    id = e.pointerId;
+    try { pad.setPointerCapture(id); } catch (err) { /* 部分瀏覽器不支援時仍可拖曳 */ }
+    pad.classList.add('dragging');
+    sx = e.clientX;
+    sy = e.clientY;
+    onStart();
+  });
+  pad.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return;
+    const r = pad.getBoundingClientRect();
+    // 位移換算成 -1 ~ 1：拖曳約 35% 邊長為滿舵
+    onMove(vsClamp((e.clientX - sx) / (r.width * 0.35), -1, 1), vsClamp((sy - e.clientY) / (r.height * 0.35), -1, 1));
+    vsRender();
+  });
+  const end = e => {
+    if (e.pointerId !== id) return;
+    id = null;
+    pad.classList.remove('dragging');
+    onEnd();
+    vsRender();
+  };
+  pad.addEventListener('pointerup', end);
+  pad.addEventListener('pointercancel', end);
+}
+
+function vsInit() {
+  if (vs.bound) return;
+  vs.bound = true;
+  let thr0 = 0;
+  // 左：上下油門（相對、放開維持），左右偏航（放開回中）
+  vsBindPad($('#vsLeft'), () => (thr0 = vs.thr),
+    (x, y) => { vs.yaw = Math.round(x * 500); vs.thr = Math.round(vsClamp(thr0 + y * 500, 0, 1000)); },
+    () => (vs.yaw = 0));
+  // 右：俯仰／橫滾，放開回中
+  vsBindPad($('#vsRight'), () => {},
+    (x, y) => { vs.roll = Math.round(x * 500); vs.pitch = Math.round(y * 500); },
+    () => { vs.roll = 0; vs.pitch = 0; });
+
+  window.addEventListener('keydown', e => {
+    if (!vsControlling() || location.hash !== '#vstick' || e.target.closest('input, select, textarea')) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (['w', 's', 'a', 'd', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) {
+      e.preventDefault();
+      if (k === ' ') vs.thr = 0;
+      else vs.keys.add(k);
+    }
+  });
+  window.addEventListener('keyup', e => vs.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+  window.addEventListener('blur', () => vs.keys.clear());
+
+  $('#vsStartBtn').onclick = vsStart;
+  $('#vsStopBtn').onclick = vsStop;
+  $('#vsArm').onclick = vsToggleArm;
+  vsRender();
+}
+
+// 鍵盤：按住時給 80% 舵量，放開回中；W／S 漸進調整油門
+function vsApplyKeys() {
+  const k = vs.keys;
+  if (k.has('w')) vs.thr = Math.min(1000, vs.thr + 12);
+  if (k.has('s')) vs.thr = Math.max(0, vs.thr - 12);
+  const axis = (name, neg, pos) => {
+    if (k.has(neg) || k.has(pos)) {
+      vs[name] = (k.has(pos) ? 400 : 0) - (k.has(neg) ? 400 : 0);
+      vs.kb[name] = true;
+    } else if (vs.kb[name]) {
+      vs[name] = 0;
+      vs.kb[name] = false;
+    }
+  };
+  axis('yaw', 'a', 'd');
+  axis('pitch', 'ArrowDown', 'ArrowUp');
+  axis('roll', 'ArrowLeft', 'ArrowRight');
+}
+
+function vsSend(release = false) {
+  if (!vs.ws || vs.ws.readyState !== WebSocket.OPEN) return;
+  const dv = new DataView(new ArrayBuffer(10));
+  dv.setUint8(0, 1);
+  dv.setUint8(1, (vs.arm ? 1 : 0) | (release ? 2 : 0));
+  dv.setUint16(2, vs.thr, true);
+  dv.setInt16(4, vs.roll, true);
+  dv.setInt16(6, vs.pitch, true);
+  dv.setInt16(8, vs.yaw, true);
+  vs.ws.send(dv.buffer);
+}
+
+async function vsConnect() {
+  clearTimeout(vs.retryTimer);
+  if (!vs.want) return;
+  let cfg;
+  try {
+    cfg = await api('/api/vstick', { timeout: 2000 });
+  } catch (e) {
+    vs.retryTimer = setTimeout(vsConnect, 1000);
+    return;
+  }
+  const ws = new WebSocket(`ws://${location.hostname}:${cfg.port}/?t=${encodeURIComponent(cfg.token)}`);
+  ws.binaryType = 'arraybuffer';
+  vs.ws = ws;
+  ws.onopen = () => {
+    clearInterval(vs.sendTimer);
+    vs.sendTimer = setInterval(() => { vsApplyKeys(); vsSend(); vsRender(); }, VS_SEND_MS);
+    vsRender();
+  };
+  ws.onmessage = e => {
+    let m;
+    try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (m.t === 'err') {
+      toast(m.msg, true);
+      if (vs.serverMode === 'idle') vsDisconnect();   // 開始接管被拒
+      return;
+    }
+    // 重新整理頁面後接續：沿用遙控器最後的油門與解鎖，避免油門歸零或誤上鎖
+    if (m.t === 'hello' && m.mode !== 'idle') {
+      vs.thr = m.thr;
+      vs.arm = m.arm;
+    }
+    vs.serverMode = m.mode;
+    // 飛控自行上鎖（失控保護、翻機保護…）時，把網頁的 ARM 也關掉
+    const fcArmed = m.ok && m.armed;
+    if (vs.prevFcArmed && !fcArmed && vs.arm) {
+      vs.arm = false;
+      toast('飛控已上鎖', true);
+    }
+    vs.prevFcArmed = fcArmed;
+    vs.st = m;
+    vsRender();
+  };
+  ws.onclose = () => {
+    if (vs.ws === ws) vs.ws = null;
+    clearInterval(vs.sendTimer);
+    if (vs.want) vs.retryTimer = setTimeout(vsConnect, 500);   // 非使用者停止：自動重連
+    vsRender();
+  };
+}
+
+function vsDisconnect() {
+  vs.want = false;
+  clearTimeout(vs.retryTimer);
+  clearInterval(vs.sendTimer);
+  if (vs.ws) vs.ws.close();
+  vs.ws = null;
+  vs.arm = false;
+  vsRender();
+}
+
+function vsStart() {
+  const resume = vs.serverMode === 'lost';
+  if (!resume && !confirm('開始虛擬遙控？\n\n• 實體搖桿將暫停使用\n• 網頁切到背景、螢幕關閉或 WiFi 斷線時，飛控會進入失控保護\n• 第一次使用請拆下螺旋槳測試')) return;
+  vs.want = true;
+  if (!resume) Object.assign(vs, { thr: 0, yaw: 0, pitch: 0, roll: 0, arm: false });
+  vsConnect();
+  vsRender();
+}
+
+function vsStop() {
+  if (vs.st && vs.st.ok && vs.st.armed) return toast('飛控解鎖中無法停止，請先降落並上鎖', true);
+  vsSend(true);   // 要求交回實體搖桿
+  setTimeout(vsDisconnect, 150);
+}
+
+function vsToggleArm() {
+  if (!vsControlling()) return;
+  if (!vs.arm) {
+    if (vs.thr > 50) return toast('請先把油門拉到最低再解鎖', true);
+    vs.arm = true;
+  } else {
+    if (vs.st && vs.st.ok && vs.st.armed && !confirm('飛行中上鎖會讓馬達立即停止，確定？')) return;
+    vs.arm = false;
+  }
+  vsRender();
+}
+
+function vsPlaceKnob(pad, x, y) {
+  const k = $('.vs-knob', pad);
+  k.style.left = 50 + x * 35 + '%';
+  k.style.top = 50 - y * 35 + '%';
+}
+
+function vsRender() {
+  if (!vs.bound) return;
+  const st = vs.st, on = vsControlling();
+  const mode = vs.serverMode;
+  badges($('#vsBadges'), [
+    on ? ['網頁連線中', 'ok'] : vs.want ? ['連線中…', 'warn'] : ['未連線', ''],
+    mode === 'active' ? ['網頁控制中', 'ok'] : mode === 'lost' ? ['網頁中斷（失控保護）', 'bad'] : ['實體搖桿', ''],
+    st && (st.ok ? ['飛控連線中', 'ok'] : ['未連線飛控', 'warn']),
+    st && st.ok && (st.armed ? ['已解鎖', 'bad'] : ['已上鎖', 'ok']),
+    st && st.ok && st.fs && ['飛控失控保護', 'bad'],
+    st && st.ok && !st.imu && ['IMU 異常', 'bad'],
+  ]);
+  $('#vsTelem').textContent = st && st.ok
+    ? `Roll ${deg(st.r)}　Pitch ${deg(st.p)}　Yaw ${st.y} °/s${st.v > 0 ? `　電池 ${st.v.toFixed(2)} V` : ''}`
+    : '';
+
+  vsPlaceKnob($('#vsLeft'), vs.yaw / 500, vs.thr / 500 - 1);
+  vsPlaceKnob($('#vsRight'), vs.roll / 500, vs.pitch / 500);
+  $$('.vs-pad').forEach(p => p.classList.toggle('disabled', !on));
+  kv($('#vsValues'), [['油門', vs.thr], ['Yaw', vs.yaw], ['Pitch', vs.pitch], ['Roll', vs.roll]]);
+
+  const fcArmed = st && st.ok && st.armed;
+  const start = $('#vsStartBtn');
+  start.disabled = vs.want;
+  start.textContent = !vs.want && mode === 'lost' ? '重新連線接管' : '開始虛擬遙控';
+  $('#vsStopBtn').disabled = !vs.want || fcArmed;
+  const arm = $('#vsArm');
+  arm.disabled = !on;
+  arm.setAttribute('aria-checked', vs.arm ? 'true' : 'false');
+  $('.switch-text', arm).textContent = vs.arm ? 'ARM ON' : 'ARM OFF';
+}
+
+// 未連線時，定期讀取遙控器狀態（例如顯示「網頁中斷」以便重新接管）
+async function vsPollIdle() {
+  if (vs.ws) return;
+  const s = await api('/api/vstick');
+  vs.serverMode = s.mode;
+  vsRender();
 }
 
 // ---------------------------------------------------------------------------

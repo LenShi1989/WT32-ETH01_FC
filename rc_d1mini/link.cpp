@@ -4,6 +4,7 @@
 #include "config.h"
 #include "protocol.h"
 #include "settings.h"
+#include "vstick.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
@@ -21,6 +22,7 @@ bool useFixed = false;
 uint16_t targetPort = LINK_FC_PORT;
 IPAddress currentTarget(255, 255, 255, 255);
 uint32_t txRate = 0, rxRate = 0;
+VStick::Mode inputMode = VStick::IDLE;
 
 void loadTarget() {
   IPAddress ip;
@@ -35,6 +37,7 @@ void loadTarget() {
 void linkTask(void *) {
   uint16_t seq = 0;
   uint32_t txCount = 0, rxCount = 0, rateStamp = millis();
+  bool lastVirtual = false, armLatch = false;
   const TickType_t period = pdMS_TO_TICKS(1000 / LINK_SEND_HZ);
   TickType_t lastWake = xTaskGetTickCount();
 
@@ -63,12 +66,32 @@ void linkTask(void *) {
       if (accept) rxCount++;
     }
 
-    // ---- 決定目標位址：指定 IP > 自動學到的飛控 IP > 廣播 ----
+    // ---- 輸入來源：實體搖桿，或網頁虛擬搖桿接管 ----
     Sticks::Values s = Sticks::read();
+    VStick::Input vin;
+    VStick::Mode vmode = VStick::get(vin);
+    bool useVirtual = vmode != VStick::IDLE;
+    if (vmode == VStick::ACTIVE) {
+      s.thr = vin.thr;
+      s.roll = vin.roll;
+      s.pitch = vin.pitch;
+      s.yaw = vin.yaw;
+      s.arm = vin.arm;
+    }
+    // 切換輸入來源後，必須先看到新來源的解鎖為 OFF 才放行解鎖（避免切換瞬間誤解鎖）
+    if (useVirtual != lastVirtual) {
+      armLatch = true;
+      lastVirtual = useVirtual;
+    }
+    if (armLatch && !s.arm) armLatch = false;
+    if (armLatch) s.arm = false;
+
+    // ---- 決定目標位址：指定 IP > 自動學到的飛控 IP > 廣播 ----
     IPAddress target;
     uint16_t port;
     portENTER_CRITICAL(&mux);
     lastSticks = s;
+    inputMode = vmode;
     bool fcAlive = lastTelemAt && now - lastTelemAt < LINK_RELEARN_MS;
     if (useFixed) target = fixedIp;
     else if (fcAlive) target = fcIp;
@@ -78,7 +101,8 @@ void linkTask(void *) {
     portEXIT_CRITICAL(&mux);
 
     // ---- 送出控制封包 ----
-    if (WiFi.isConnected() || WiFi.softAPgetStationNum() > 0) {
+    // 網頁接管但中斷（LOST）時不送：讓飛控因收不到封包進入失控保護，而不是送出「上鎖」讓它直接停槳
+    if (vmode != VStick::LOST && (WiFi.isConnected() || WiFi.softAPgetStationNum() > 0)) {
       CtrlPacket p{};
       p.magic = LINK_MAGIC_CTRL;
       p.version = LINK_VERSION;
@@ -187,6 +211,10 @@ void fillStatus(JsonObject out) {
   JsonArray raw = out["raw"].to<JsonArray>();
   for (int i = 0; i < 4; i++) raw.add(s.raw[i]);
   out["arm"] = s.arm;
+  portENTER_CRITICAL(&mux);
+  VStick::Mode m = inputMode;
+  portEXIT_CRITICAL(&mux);
+  out["source"] = m == VStick::ACTIVE ? "virtual" : m == VStick::LOST ? "lost" : "physical";
 
   JsonObject l = out["link"].to<JsonObject>();
   l["ok"] = t.ok;

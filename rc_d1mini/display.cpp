@@ -4,6 +4,7 @@
 #include "config.h"
 #include "settings.h"
 #include "link.h"
+#include "vstick.h"
 #include <Wire.h>
 #include <WiFi.h>
 #include <Adafruit_GFX.h>
@@ -47,8 +48,14 @@ void drawMain(const Sticks::Values &s, const Link::Telem &t) {
   oled.setCursor(0, 0);
   if (WiFi.isConnected()) {
     oled.print(WiFi.localIP());
-    oled.setCursor(98, 0);
-    oled.print(WiFi.RSSI());
+    VStick::Input vin;
+    VStick::Mode vm = VStick::get(vin);
+    if (vm == VStick::IDLE) {
+      oled.setCursor(98, 0);
+      oled.print(WiFi.RSSI());
+    } else {
+      printRight(0, vm == VStick::ACTIVE ? "WEB" : "WEB!");  // 網頁虛擬遙控中（! = 網頁中斷）
+    }
   } else if (WiFi.getMode() & WIFI_AP) {
     oled.print("AP ");
     oled.print(WiFi.softAPIP());

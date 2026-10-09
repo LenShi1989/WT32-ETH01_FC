@@ -27,7 +27,7 @@ struct Stats {
 void begin();                 // 啟動 50Hz 發送任務
 void applyTarget();           // 飛控目標設定變更後呼叫
 Telem telem();
-Sticks::Values sticks();
+Sticks::Values sticks();       // 實際送出的搖桿值（網頁接管時為虛擬搖桿值）
 Stats stats();
 String targetText();          // 目前送往的位址
 String fcIpText();            // 回應的飛控 IP

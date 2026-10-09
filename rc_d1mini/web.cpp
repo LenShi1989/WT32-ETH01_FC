@@ -5,6 +5,7 @@
 #include "net.h"
 #include "link.h"
 #include "outputs.h"
+#include "vstick.h"
 #include <sys/time.h>
 #include <WebServer.h>
 #include <SPIFFS.h>
@@ -133,6 +134,7 @@ void handleInfo() {
   f["sticks"] = true;
   f["oled"] = true;
   f["do"] = true;
+  f["vstick"] = true;
   sendJson(doc);
 }
 
@@ -262,6 +264,8 @@ void handleSticksGet() {
 
 void handleSticksStart() {
   if (!auth() || refuseIfFlying()) return;
+  VStick::Input vin;
+  if (VStick::get(vin) != VStick::IDLE) return sendError(409, "網頁虛擬遙控中，請先停止虛擬遙控");
   Sticks::startCalibration();
   sendOk("校正開始：請把每支搖桿推到各方向底端");
 }
@@ -452,6 +456,18 @@ void handleDoPulse() {
   sendOk("已觸發");
 }
 
+// 網頁虛擬搖桿：取得 WebSocket 連線資訊（權杖只透過已登入的 API 發放）
+void handleVStickGet() {
+  if (!auth()) return;
+  JsonDocument doc;
+  doc["port"] = VSTICK_WS_PORT;
+  doc["token"] = VStick::token();
+  doc["staleMs"] = VSTICK_STALE_MS;
+  doc["releaseMs"] = VSTICK_RELEASE_MS;
+  VStick::fillStatus(doc.as<JsonObject>());
+  sendJson(doc);
+}
+
 // 以瀏覽器時間校時（沒有對外網路、NTP 無法使用時）
 void handleTimeSet() {
   if (!auth()) return;
@@ -591,6 +607,7 @@ void begin() {
   server.on("/api/do/set", HTTP_POST, handleDoSet);
   server.on("/api/do/pulse", HTTP_POST, handleDoPulse);
   server.on("/api/time", HTTP_POST, handleTimeSet);
+  server.on("/api/vstick", HTTP_GET, handleVStickGet);
   server.on("/api/user", HTTP_POST, handleUserSave);
   server.on("/api/user/clear", HTTP_POST, handleUserClear);
   server.on("/api/reboot", HTTP_POST, handleReboot);

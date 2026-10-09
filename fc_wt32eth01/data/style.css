@@ -314,6 +314,41 @@ fieldset:disabled { opacity: .5; }
 .days input:checked + span { background: var(--primary); border-color: var(--primary); color: #fff; }
 .days input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
 
+/* 虛擬遙控 */
+.vs-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.vs-status .badges { margin: 0; }
+.vs-telem { font-variant-numeric: tabular-nums; }
+.vs-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 18px; }
+.vs-arm .switch-text { min-width: 70px; }
+.vs-arm[aria-checked="true"] .switch-track { background: var(--danger); }
+.vs-arm[aria-checked="true"] .switch-text { color: var(--danger); }
+.vs-pads { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.vs-col { display: grid; justify-items: center; gap: 8px; }
+.vs-pad {
+  --size: min(260px, 40vw);
+  position: relative; width: var(--size); height: var(--size); border-radius: 18px;
+  background: var(--input-bg); border: 1px solid var(--line); touch-action: none; user-select: none; cursor: grab;
+}
+.vs-pad.disabled { opacity: .45; cursor: not-allowed; }
+.vs-pad.dragging { cursor: grabbing; border-color: var(--primary); }
+.vs-cross { position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat,
+    linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat; }
+.vs-knob {
+  position: absolute; left: 50%; top: 50%; width: 30%; height: 30%; border-radius: 50%; pointer-events: none;
+  transform: translate(-50%, -50%); background: var(--primary); box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+  border: 3px solid rgba(255, 255, 255, .85);
+}
+.vs-caption { font-size: 13px; color: var(--muted); }
+.vs-values { grid-template-columns: max-content max-content; align-self: center; font-size: 15px; gap: 6px 12px; }
+.vs-values dd { min-width: 48px; text-align: right; font-weight: 600; }
+.vs-notes { margin: 18px 0 0; padding-left: 18px; line-height: 1.7; }
+@media (max-width: 560px) {
+  .vs-pad { --size: min(42vw, 200px); }
+  .vs-values { order: 3; width: 100%; grid-template-columns: repeat(4, max-content max-content); justify-content: center; }
+}
+
 /* OLED 畫面示意 */
 .oled {
   margin: 0 0 10px; padding: 10px 12px; border-radius: 6px;

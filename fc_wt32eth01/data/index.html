@@ -34,6 +34,7 @@
     <a href="#sticks" data-feature="sticks">搖桿校正</a>
     <a href="#oled" data-feature="oled">OLED 顯示</a>
     <a href="#do" data-feature="do">DO 設定</a>
+    <a href="#vstick" data-feature="vstick">虛擬遙控</a>
     <a href="#ota">OTA 更新</a>
     <a href="#user">使用者設定</a>
   </nav>
@@ -290,6 +291,51 @@ R +1.2 P -0.4 11.8V</pre>
           <button type="button" id="timeSyncBtn" class="btn ghost">以瀏覽器時間同步</button>
         </div>
         <p class="muted small">定時排程需要正確時間。連上可上網的 WiFi 時會自動以 NTP 校時；否則開啟此網頁時會以瀏覽器時間同步。重新開機後若無 NTP，需再開一次網頁同步。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 虛擬遙控（遙控器）：兩個虛擬搖桿，經 WebSocket 控制無人機 -->
+  <section id="page-vstick" class="page" data-feature="vstick">
+    <h1>虛擬遙控</h1>
+    <div class="grid">
+      <div class="card wide vs-card">
+        <div class="vs-status">
+          <div id="vsBadges" class="badges"></div>
+          <div id="vsTelem" class="vs-telem muted small"></div>
+        </div>
+
+        <div class="vs-actions">
+          <button type="button" id="vsStartBtn" class="btn primary">開始虛擬遙控</button>
+          <button type="button" id="vsStopBtn" class="btn ghost" disabled>停止</button>
+          <button type="button" id="vsArm" class="switch vs-arm" role="switch" aria-checked="false" aria-label="解鎖 ARM" disabled>
+            <span class="switch-track"><span class="switch-thumb"></span></span><span class="switch-text">ARM OFF</span>
+          </button>
+        </div>
+
+        <div class="vs-pads">
+          <div class="vs-col">
+            <div id="vsLeft" class="vs-pad" aria-label="左搖桿：油門與偏航">
+              <div class="vs-cross"></div><div class="vs-knob"></div>
+            </div>
+            <div class="vs-caption">油門 ↕ ／ Yaw ↔</div>
+          </div>
+          <dl id="vsValues" class="vs-values"></dl>
+          <div class="vs-col">
+            <div id="vsRight" class="vs-pad" aria-label="右搖桿：俯仰與橫滾">
+              <div class="vs-cross"></div><div class="vs-knob"></div>
+            </div>
+            <div class="vs-caption">Pitch ↕ ／ Roll ↔</div>
+          </div>
+        </div>
+
+        <ul class="vs-notes muted small">
+          <li>Mode 2：左搖桿上下為油門（放開後停在原位）、左右為偏航；右搖桿為俯仰／橫滾（放開自動回中）。</li>
+          <li>鍵盤：W／S 油門、A／D 偏航、方向鍵 俯仰／橫滾、空白鍵 油門歸零。</li>
+          <li>只能在飛控「上鎖」時開始；開始後實體搖桿暫停使用。解鎖前請先把油門拉到最低。</li>
+          <li>網頁切到背景、螢幕關閉或 WiFi 斷線超過 0.3 秒，遙控器會停送控制封包，飛控進入失控保護（保持水平、3 秒內降油門後上鎖）。5 秒後自動交回實體搖桿。</li>
+          <li>WiFi 延遲與斷線風險高於實體搖桿，第一次使用請拆下螺旋槳測試。</li>
+        </ul>
       </div>
     </div>
   </section>
