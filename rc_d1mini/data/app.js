@@ -79,7 +79,11 @@ const pages = {
   sticks: { enter: () => { stickFormLoaded = false; poll(loadSticks, 150); } },
   oled: { enter: loadOled },
   do: { enter: () => { doLoaded.fill(false); poll(loadDo, 1000); } },
-  ota: {},
+  ota: { enter: () => {
+    $('#otaFsHint').textContent = info.fsPart
+      ? `本裝置 SPIFFS 分區大小：${info.fsPart} bytes（0x${info.fsPart.toString(16).toUpperCase()}），SPIFFS 映像大小必須相同。`
+      : '';
+  } },
   user: { enter: () => { $('#userForm').user.value = info.user || ''; renderAuth(); } },
 };
 
@@ -567,11 +571,16 @@ function uploadOta(e) {
   const form = e.target, file = form.file.files[0];
   if (!file) return;
   const type = form.querySelector('[name=type]:checked').value;
+  if (type === 'fs' && info.fsPart && file.size !== info.fsPart) {
+    $('#otaState').textContent = `映像大小 ${file.size} bytes 與 SPIFFS 分區 ${info.fsPart} bytes 不符，` +
+      '請確認 Partition Scheme，並把 spiffs.bat 的 SPIFFS_SIZE 設為 0x' + info.fsPart.toString(16).toUpperCase();
+    return;
+  }
   const btn = form.querySelector('button'), bar = $('#otaBar'), st = $('#otaState');
   const fd = new FormData();
   fd.append('file', file, file.name);
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/ota?type=' + type);
+  xhr.open('POST', `/api/ota?type=${type}&size=${file.size}`);
   xhr.upload.onprogress = ev => {
     if (!ev.lengthComputable) return;
     const pct = (ev.loaded / ev.total) * 100;

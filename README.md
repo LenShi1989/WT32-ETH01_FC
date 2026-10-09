@@ -158,6 +158,8 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
    - 產生後到裝置網頁「OTA 更新」頁，選「網頁檔 (SPIFFS .bin)」上傳對應的檔案。
    - 還沒上傳過網頁檔時，首頁會顯示救援上傳頁面，也可以在那裡上傳。
    - 映像大小對應 Partition Scheme「Default 4MB with spiffs」（0x160000）。換成其他分區時，請修改 `spiffs.bat` 裡的 `SPIFFS_SIZE`。
+   - OTA 頁會顯示裝置的 SPIFFS 分區大小。映像大小不符時，上傳前就會被擋下，不會寫壞分區。
+   - 上傳失敗時不會自動格式化。若分區已被寫壞，首頁會改顯示救援上傳頁，可直接重傳；序列埠會印出 `[OTA] 失敗：原因`。
 
 韌體 OTA 用的 `.bin`：在 IDE 選「草稿碼 → 匯出已編譯的二進位檔」，取 `*.ino.bin`。
 
@@ -214,8 +216,8 @@ WT32-ETH01 沒有 USB：用 USB-TTL 接 TX0(GPIO1)／RX0(GPIO3)，**GPIO0 接 GN
 
 | 專案 | 目前版本 |
 |---|---|
-| `fc_wt32eth01` | 1.1.0 |
-| `rc_d1mini` | 1.2.0 |
+| `fc_wt32eth01` | 1.1.1 |
+| `rc_d1mini` | 1.2.1 |
 
 ## 可在 `config.h` 調整的項目
 

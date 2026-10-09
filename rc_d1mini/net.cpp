@@ -3,6 +3,7 @@
 #include "settings.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <esp_mac.h>
 #include <time.h>
 
 namespace {
@@ -50,8 +51,9 @@ void begin() {
   setenv("TZ", TIMEZONE, 1);
   tzset();
 
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
+  // WiFi 驅動啟動前 WiFi.macAddress() 會回傳全 0，直接從 eFuse 讀 STA MAC
+  uint8_t mac[6] = {};
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
   char suffix[8];
   snprintf(suffix, sizeof(suffix), "%02X%02X", mac[4], mac[5]);
   apSsid = String(AP_SSID_PREFIX) + suffix;

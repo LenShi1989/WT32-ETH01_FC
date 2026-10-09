@@ -8,6 +8,7 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <Update.h>
+#include <esp_partition.h>
 #include <ArduinoJson.h>
 
 namespace {
@@ -16,7 +17,12 @@ uint32_t rebootAt = 0;
 bool otaOk = false;
 bool otaAuthed = false;
 bool otaIsFs = false;
+bool otaFsEnded = false;   // 已卸載 SPIFFS（開始寫入分區）
 String otaMsg;
+
+const esp_partition_t *fsPartition() {
+  return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+}
 
 // SPIFFS 沒有網頁檔時的救援頁面：可直接上傳 SPIFFS 映像
 const char FALLBACK_HTML[] PROGMEM = R"HTML(<!doctype html><html lang="zh-Hant"><meta charset="utf-8">
@@ -118,6 +124,8 @@ void handleInfo() {
   doc["name"] = DEVICE_NAME;
   doc["fw"] = FW_VERSION;
   doc["build"] = FW_BUILD;
+  const esp_partition_t *fsp = fsPartition();
+  doc["fsPart"] = fsp ? fsp->size : 0;
   doc["user"] = Settings::user.user;
   doc["authRequired"] = authRequired();
   JsonObject f = doc["features"].to<JsonObject>();
@@ -330,9 +338,26 @@ void handleOtaUpload() {
       }
       Flight::setLockout(true);
       otaIsFs = server.arg("type") == "fs";
-      if (otaIsFs) SPIFFS.end();
-      Serial.printf("[OTA] 開始：%s (%s)\n", up.filename.c_str(), otaIsFs ? "SPIFFS" : "韌體");
-      otaOk = Update.begin(UPDATE_SIZE_UNKNOWN, otaIsFs ? U_SPIFFS : U_FLASH);
+      otaFsEnded = false;
+      // 網頁會帶 size（檔案大小）；救援頁沒有帶，為 0
+      size_t size = server.hasArg("size") ? (size_t)server.arg("size").toInt() : 0;
+      Serial.printf("[OTA] 開始：%s (%s) %u bytes\n", up.filename.c_str(), otaIsFs ? "SPIFFS" : "韌體", (unsigned)size);
+      if (otaIsFs) {
+        // 先檢查大小再動分區：映像大小必須等於 SPIFFS 分區，否則寫入後也無法掛載
+        const esp_partition_t *p = fsPartition();
+        if (!p) {
+          otaMsg = "找不到 SPIFFS 分區，請確認 Partition Scheme";
+          break;
+        }
+        if (size && size != p->size) {
+          otaMsg = "映像大小 " + String(size) + " bytes 與 SPIFFS 分區 " + String(p->size) +
+                   " bytes 不符。請確認 Partition Scheme，並讓 spiffs.bat 的 SPIFFS_SIZE 與分區大小相同";
+          break;
+        }
+        SPIFFS.end();
+        otaFsEnded = true;
+      }
+      otaOk = Update.begin(size ? size : UPDATE_SIZE_UNKNOWN, otaIsFs ? U_SPIFFS : U_FLASH);
       if (!otaOk) otaMsg = Update.errorString();
       break;
     }
@@ -368,7 +393,9 @@ void handleOtaDone() {
     return;
   }
   if (Update.isRunning()) Update.abort();
-  if (otaIsFs) SPIFFS.begin(true);
+  Serial.printf("[OTA] 失敗：%s\n", otaMsg.isEmpty() ? "未收到檔案" : otaMsg.c_str());
+  // 不自動格式化：分區若已被寫壞就維持未掛載，首頁會顯示救援上傳頁，可直接重傳
+  if (otaFsEnded && !SPIFFS.begin(false)) Serial.println("[OTA] SPIFFS 內容無效，請重新上傳 SPIFFS 映像");
   Flight::setLockout(false);
   sendError(500, "更新失敗：" + (otaMsg.isEmpty() ? String("未收到檔案") : otaMsg));
 }
